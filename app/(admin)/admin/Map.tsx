@@ -65,7 +65,7 @@ export default function Map({
 
     setMarker(initialCoordinates);
     onLocationSelect(initialCoordinates.lat, initialCoordinates.lng);
-  }, [initialCoordinates?.lat, initialCoordinates?.lng, marker.lat, marker.lng, onLocationSelect]);
+  }, [initialCoordinates, marker, onLocationSelect]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -76,7 +76,7 @@ export default function Map({
     if (mapRef.current.getZoom() !== 14) {
       mapRef.current.setZoom(14);
     }
-  }, [marker.lat, marker.lng]);
+  }, [marker]);
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) {
