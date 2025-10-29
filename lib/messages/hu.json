@@ -1,0 +1,43 @@
+{
+  "common": {
+    "loading": "Betöltés...",
+    "error": "Hiba történt",
+    "success": "Sikeres",
+    "cancel": "Mégse",
+    "save": "Mentés",
+    "delete": "Törlés",
+    "edit": "Szerkesztés",
+    "back": "Vissza",
+    "next": "Következő",
+    "previous": "Előző"
+  },
+  "auth": {
+    "login": "Bejelentkezés",
+    "signup": "Regisztráció",
+    "logout": "Kijelentkezés",
+    "email": "E-mail",
+    "password": "Jelszó",
+    "confirmPassword": "Jelszó megerősítése",
+    "forgotPassword": "Elfelejtetted a jelszavad?",
+    "rememberMe": "Emlékezz rám"
+  },
+  "apartment": {
+    "title": "Apartman",
+    "apartments": "Apartmanok",
+    "price": "Ár",
+    "bedrooms": "Szobák",
+    "bathrooms": "Fürdőszobák",
+    "location": "Hely",
+    "search": "Apartmanok keresése",
+    "filter": "Szűrés",
+    "details": "Részletek",
+    "contact": "Tulajdonos kapcsolata"
+  },
+  "dashboard": {
+    "title": "Irányítópult",
+    "welcome": "Üdvözlünk",
+    "profile": "Profil",
+    "settings": "Beállítások",
+    "logout": "Kijelentkezés"
+  }
+}

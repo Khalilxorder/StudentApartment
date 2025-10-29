@@ -15,13 +15,13 @@ const I18nContext = createContext<{
 export async function getMessages(locale: Locale): Promise<Record<string, any>> {
   try {
     if (locale === 'hu') {
-      const messages = await import('../messages/hu.json');
+      const messages = await import('./messages/hu.json');
       return messages.default || messages;
     }
-    const messages = await import('../messages/en.json');
+    const messages = await import('./messages/en.json');
     return messages.default || messages;
   } catch {
-    const messages = await import('../messages/en.json');
+    const messages = await import('./messages/en.json');
     return messages.default || messages;
   }
 }
