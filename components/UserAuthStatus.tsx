@@ -96,7 +96,7 @@ export default function UserAuthStatus() {
     );
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   const handleSignIn = () => {
     router.push('/login');
