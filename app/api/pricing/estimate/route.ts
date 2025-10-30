@@ -30,8 +30,7 @@ export async function GET(request: NextRequest) {
     // If apartmentId provided, fetch apartment details
     let apartment = null;
     if (apartmentId) {
-      const { data, error } = await supabase
-        .from('apartments')
+      const { data, error } = await getSupabaseClient()`n        .from('apartments')
         .select('*')
         .eq('id', apartmentId)
         .single();
@@ -65,8 +64,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get comparable apartments for market context
-    const { data: comparables } = await supabase
-      .from('apartments')
+    const { data: comparables } = await getSupabaseClient()`n      .from('apartments')
       .select('id, title, monthly_rent_huf, bedrooms, bathrooms, district, size_sqm')
       .eq('district', pricingInput.district)
       .eq('bedrooms', pricingInput.bedrooms)

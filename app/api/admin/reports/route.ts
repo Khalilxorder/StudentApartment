@@ -10,8 +10,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update the report status
-    const { error: reportError } = await supabase
-      .from('user_reports')
+    const { error: reportError } = await getSupabaseClient()`n      .from('user_reports')
       .update({
         status,
         resolved_at: new Date().toISOString(),
@@ -27,8 +26,7 @@ export async function PATCH(request: NextRequest) {
     // If the report is resolved, potentially update trust scores or take other actions
     if (status === 'resolved') {
       // Get the report details to potentially penalize the reported user
-      const { data: report } = await supabase
-        .from('user_reports')
+      const { data: report } = await getSupabaseClient()`n        .from('user_reports')
         .select('target_user_id, severity')
         .eq('id', reportId)
         .single();
@@ -45,8 +43,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Log the admin action
-    await supabase
-      .from('audit_logs')
+    await getSupabaseClient()`n      .from('audit_logs')
       .insert({
         action: `report_${status}`,
         details: { report_id: reportId, admin_notes: notes },

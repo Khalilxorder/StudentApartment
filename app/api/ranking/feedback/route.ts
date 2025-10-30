@@ -71,8 +71,7 @@ export async function POST(request: NextRequest) {
       contacted: 1,
     }[validatedData.feedback];
 
-    const { data: apartmentData, error: apartmentError } = await supabase
-      .from('apartments')
+    const { data: apartmentData, error: apartmentError } = await getSupabaseClient()`n      .from('apartments')
       .select('*')
       .eq('id', validatedData.apartmentId)
       .single();

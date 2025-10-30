@@ -12,8 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
-      .from('user_profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('user_profiles')
       .select('user_type')
       .eq('user_id', user.id)
       .single();
@@ -55,23 +54,19 @@ async function getDashboardOverview(supabase: any, timeframe: string) {
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // User metrics
-  const { count: totalUsers } = await supabase
-    .from('user_profiles')
+  const { count: totalUsers } = await getSupabaseClient()`n    .from('user_profiles')
     .select('*', { count: 'exact', head: true });
 
-  const { count: newUsers } = await supabase
-    .from('user_profiles')
+  const { count: newUsers } = await getSupabaseClient()`n    .from('user_profiles')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', startDate);
 
-  const { count: verifiedUsers } = await supabase
-    .from('user_profiles')
+  const { count: verifiedUsers } = await getSupabaseClient()`n    .from('user_profiles')
     .select('*', { count: 'exact', head: true })
     .eq('identity_verified', true);
 
   // Student vs Owner breakdown
-  const { data: userTypes } = await supabase
-    .from('user_profiles')
+  const { data: userTypes } = await getSupabaseClient()`n    .from('user_profiles')
     .select('user_type')
     .in('user_type', ['student', 'owner']);
 
@@ -79,22 +74,18 @@ async function getDashboardOverview(supabase: any, timeframe: string) {
   const ownerCount = userTypes?.filter((u: any) => u.user_type === 'owner').length || 0;
 
   // Safety metrics
-  const { count: totalReports } = await supabase
-    .from('user_reports')
+  const { count: totalReports } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true });
 
-  const { count: recentReports } = await supabase
-    .from('user_reports')
+  const { count: recentReports } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true })
     .gte('reported_at', startDate);
 
   // Engagement metrics (would need actual booking/message data)
-  const { count: totalMessages } = await supabase
-    .from('messages')
+  const { count: totalMessages } = await getSupabaseClient()`n    .from('messages')
     .select('*', { count: 'exact', head: true });
 
-  const { count: recentMessages } = await supabase
-    .from('messages')
+  const { count: recentMessages } = await getSupabaseClient()`n    .from('messages')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', startDate);
 
@@ -119,12 +110,10 @@ async function getUserMetrics(supabase: any, timeframe: string) {
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // User registration trends
-  const { data: userTrends } = await supabase
-    .rpc('get_user_registration_trends', { days });
+  const { data: userTrends } = await getSupabaseClient()`n    .rpc('get_user_registration_trends', { days });
 
   // User type distribution
-  const { data: userTypeDist } = await supabase
-    .from('user_profiles')
+  const { data: userTypeDist } = await getSupabaseClient()`n    .from('user_profiles')
     .select('user_type')
     .in('user_type', ['student', 'owner']);
 
@@ -134,12 +123,10 @@ async function getUserMetrics(supabase: any, timeframe: string) {
   };
 
   // Verification rates
-  const { count: totalUsers } = await supabase
-    .from('user_profiles')
+  const { count: totalUsers } = await getSupabaseClient()`n    .from('user_profiles')
     .select('*', { count: 'exact', head: true });
 
-  const { count: verifiedUsers } = await supabase
-    .from('user_profiles')
+  const { count: verifiedUsers } = await getSupabaseClient()`n    .from('user_profiles')
     .select('*', { count: 'exact', head: true })
     .eq('identity_verified', true);
 
@@ -186,21 +173,17 @@ async function getSafetyMetrics(supabase: any, timeframe: string) {
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // Report metrics
-  const { count: totalReports } = await supabase
-    .from('user_reports')
+  const { count: totalReports } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true });
 
-  const { count: recentReports } = await supabase
-    .from('user_reports')
+  const { count: recentReports } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true })
     .gte('reported_at', startDate);
 
-  const { data: reportTrends } = await supabase
-    .rpc('get_report_trends', { days });
+  const { data: reportTrends } = await getSupabaseClient()`n    .rpc('get_report_trends', { days });
 
   // Trust score distribution
-  const { data: trustScores } = await supabase
-    .from('trust_scores')
+  const { data: trustScores } = await getSupabaseClient()`n    .from('trust_scores')
     .select('score')
     .order('calculated_at', { ascending: false });
 
@@ -212,8 +195,7 @@ async function getSafetyMetrics(supabase: any, timeframe: string) {
   };
 
   // Verification completion rates
-  const { data: verificationStats } = await supabase
-    .from('user_profiles')
+  const { data: verificationStats } = await getSupabaseClient()`n    .from('user_profiles')
     .select('identity_verified, background_check_completed');
 
   const verificationCompletion = {
@@ -235,22 +217,18 @@ async function getEngagementMetrics(supabase: any, timeframe: string) {
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // Message metrics
-  const { count: totalMessages } = await supabase
-    .from('messages')
+  const { count: totalMessages } = await getSupabaseClient()`n    .from('messages')
     .select('*', { count: 'exact', head: true });
 
-  const { count: recentMessages } = await supabase
-    .from('messages')
+  const { count: recentMessages } = await getSupabaseClient()`n    .from('messages')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', startDate);
 
   // Conversation metrics
-  const { count: totalConversations } = await supabase
-    .from('conversations')
+  const { count: totalConversations } = await getSupabaseClient()`n    .from('conversations')
     .select('*', { count: 'exact', head: true });
 
-  const { count: activeConversations } = await supabase
-    .from('conversations')
+  const { count: activeConversations } = await getSupabaseClient()`n    .from('conversations')
     .select('*', { count: 'exact', head: true })
     .gte('last_message_at', startDate);
 

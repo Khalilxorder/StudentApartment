@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+// Lazy-load Supabase client
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 interface DigestSendRequest {
   userId: string;
@@ -28,8 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('digest_sends')
+    const { data, error } = await getSupabaseClient()`n      .from('digest_sends')
       .select('*')
       .eq('user_id', userId)
       .order('sent_at', { ascending: false })
@@ -70,8 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user preferences
-    const { data: preferences } = await supabase
-      .from('digest_preferences')
+    const { data: preferences } = await getSupabaseClient()`n      .from('digest_preferences')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -84,8 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user email
-    const { data: user } = await supabase
-      .from('users')
+    const { data: user } = await getSupabaseClient()`n      .from('users')
       .select('email')
       .eq('id', userId)
       .single();
@@ -99,8 +99,7 @@ export async function POST(request: NextRequest) {
 
     // TODO: Build digest content based on type
     // For now, create the send record
-    const { data: send, error: sendError } = await supabase
-      .from('digest_sends')
+    const { data: send, error: sendError } = await getSupabaseClient()`n      .from('digest_sends')
       .insert({
         user_id: userId,
         digest_type: type,

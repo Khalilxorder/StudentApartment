@@ -23,8 +23,7 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: apartment, error } = await supabase
-      .from('apartments')
+    const { data: apartment, error } = await getSupabaseClient()`n      .from('apartments')
       .select('latitude, longitude')
       .eq('id', apartmentId)
       .single();
@@ -88,8 +87,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Get apartment locations
-    const { data: apartments, error } = await supabase
-      .from('apartments')
+    const { data: apartments, error } = await getSupabaseClient()`n      .from('apartments')
       .select('id, latitude, longitude')
       .in('id', apartmentIds);
 

@@ -97,8 +97,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   console.log(`✅ Payment succeeded for booking: ${bookingId}`);
 
   // 1. Update booking status
-  await supabase
-    .from('bookings')
+  await getSupabaseClient()`n    .from('bookings')
     .update({
       payment_status: 'paid',
       status: 'approved',
@@ -109,8 +108,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     .eq('id', bookingId);
 
   // 2. Update payment transaction
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .update({
       status: 'succeeded',
       updated_at: new Date().toISOString(),
@@ -127,8 +125,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   });
 
   // 4. Get booking details to notify owner
-  const { data: booking } = await supabase
-    .from('bookings')
+  const { data: booking } = await getSupabaseClient()`n    .from('bookings')
     .select('owner_id, apartment_id, apartments(title)')
     .eq('id', bookingId)
     .single();
@@ -160,8 +157,7 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
   console.log(`❌ Payment failed for booking: ${bookingId}`);
 
   // 1. Update booking status
-  await supabase
-    .from('bookings')
+  await getSupabaseClient()`n    .from('bookings')
     .update({
       payment_status: 'unpaid',
       status: 'cancelled',
@@ -170,8 +166,7 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
     .eq('id', bookingId);
 
   // 2. Update payment transaction
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .update({
       status: 'failed',
       updated_at: new Date().toISOString(),
@@ -195,8 +190,7 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
 
   console.log(`🚫 Payment canceled for booking: ${bookingId}`);
 
-  await supabase
-    .from('bookings')
+  await getSupabaseClient()`n    .from('bookings')
     .update({
       payment_status: 'unpaid',
       status: 'cancelled',
@@ -204,8 +198,7 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
     })
     .eq('id', bookingId);
 
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .update({
       status: 'failed',
       updated_at: new Date().toISOString(),
@@ -230,8 +223,7 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
   }
 
   // Check if owner has completed Stripe Connect verification
-  const { data: stripeAccount, error: accountError } = await supabase
-    .from('stripe_connect_accounts')
+  const { data: stripeAccount, error: accountError } = await getSupabaseClient()`n    .from('stripe_connect_accounts')
     .select('status, stripe_account_id')
     .eq('user_id', userId)
     .single();
@@ -267,8 +259,7 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
 
   // 2. Update booking status to paid
   if (bookingId) {
-    await supabase
-      .from('bookings')
+    await getSupabaseClient()`n      .from('bookings')
       .update({
         payment_status: 'paid',
         status: 'approved',
@@ -278,8 +269,7 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
   }
 
   // 3. Create payment transaction record
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .insert({
       user_id: userId,
       booking_id: bookingId,
@@ -312,8 +302,7 @@ async function handlePayoutFailed(payout: Stripe.Payout) {
   console.log(`❌ Payout failed: ${id} for booking: ${bookingId}`);
 
   // 1. Update the payout status in payment_transactions
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .update({
       status: 'failed',
       updated_at: new Date().toISOString(),
@@ -339,8 +328,7 @@ async function handlePayoutPaid(payout: Stripe.Payout) {
   console.log(`✅ Payout paid: ${id} for booking: ${bookingId}`);
 
   // 1. Update the payout status in payment_transactions
-  await supabase
-    .from('payment_transactions')
+  await getSupabaseClient()`n    .from('payment_transactions')
     .update({
       status: 'succeeded',
       updated_at: new Date().toISOString(),

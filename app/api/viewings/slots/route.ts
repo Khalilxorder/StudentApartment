@@ -37,8 +37,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = supabase
-      .from('viewing_slots')
+    let query = getSupabaseClient()`n      .from('viewing_slots')
       .select('*')
       .eq('apartment_id', apartmentId);
 
@@ -98,8 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify apartment exists and user is owner
-    const { data: apartment, error: aptError } = await supabase
-      .from('apartments')
+    const { data: apartment, error: aptError } = await getSupabaseClient()`n      .from('apartments')
       .select('owner_id')
       .eq('id', apartmentId)
       .single();
@@ -119,8 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for overlapping slots
-    const { data: overlapping } = await supabase
-      .from('viewing_slots')
+    const { data: overlapping } = await getSupabaseClient()`n      .from('viewing_slots')
       .select('*')
       .eq('apartment_id', apartmentId)
       .or(`and(start_time.lte.${endTime},end_time.gte.${startTime})`);
@@ -133,8 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create slot
-    const { data: slot, error: createError } = await supabase
-      .from('viewing_slots')
+    const { data: slot, error: createError } = await getSupabaseClient()`n      .from('viewing_slots')
       .insert({
         apartment_id: apartmentId,
         owner_id: user.id,

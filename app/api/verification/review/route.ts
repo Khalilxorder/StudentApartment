@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Lazy-load Supabase client
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -34,7 +37,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check authentication and admin role
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await getSupabaseClient().auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -43,8 +46,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -71,8 +73,7 @@ export async function PUT(request: NextRequest) {
       updateData.rejection_reason = rejectionReason;
     }
 
-    const { data: verification, error } = await supabase
-      .from('verifications')
+    const { data: verification, error } = await getSupabaseClient()`n      .from('verifications')
       .update(updateData)
       .eq('id', verificationId)
       .select()
@@ -88,8 +89,7 @@ export async function PUT(request: NextRequest) {
 
     // If approved, update user verification status
     if (status === 'approved') {
-      await supabase
-        .from('profiles')
+      await getSupabaseClient()`n        .from('profiles')
         .update({
           verification_status: 'verified',
           verified_at: new Date().toISOString(),

@@ -43,8 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify admin role
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -127,8 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify admin role
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -151,8 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the duplicate relationship
-    const { error: insertError } = await supabase
-      .from('apartment_duplicates')
+    const { error: insertError } = await getSupabaseClient()`n      .from('apartment_duplicates')
       .upsert({
         canonical_apartment_id: canonicalApartmentId,
         duplicate_apartment_id: duplicateApartmentId,
@@ -172,8 +169,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a safety alert for moderation
-    await supabase
-      .from('audit_logs')
+    await getSupabaseClient()`n      .from('audit_logs')
       .insert({
         event: 'duplicate_marked',
         resource_type: 'apartment_duplicate',
@@ -242,8 +238,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verify admin role
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -267,8 +262,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete the duplicate relationship
-    const { error } = await supabase
-      .from('apartment_duplicates')
+    const { error } = await getSupabaseClient()`n      .from('apartment_duplicates')
       .delete()
       .eq('canonical_apartment_id', canonicalApartmentId)
       .eq('duplicate_apartment_id', duplicateApartmentId);

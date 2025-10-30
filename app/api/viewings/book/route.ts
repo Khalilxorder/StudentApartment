@@ -49,8 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get slot details and check availability
-    const { data: slot, error: slotError } = await supabase
-      .from('viewing_slots')
+    const { data: slot, error: slotError } = await getSupabaseClient()`n      .from('viewing_slots')
       .select('*, apartments(title)')
       .eq('id', slotId)
       .single();
@@ -75,8 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has a booking for this slot
-    const { data: existingBooking } = await supabase
-      .from('viewing_bookings')
+    const { data: existingBooking } = await getSupabaseClient()`n      .from('viewing_bookings')
       .select('id')
       .eq('viewing_slot_id', slotId)
       .eq('student_id', user.id)
@@ -90,8 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create booking
-    const { data: booking, error: bookingError } = await supabase
-      .from('viewing_bookings')
+    const { data: booking, error: bookingError } = await getSupabaseClient()`n      .from('viewing_bookings')
       .insert({
         viewing_slot_id: slotId,
         student_id: user.id,

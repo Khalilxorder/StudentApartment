@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
     const supabase = createClient();
 
     // 1. Fetch apartment details
-    const { data: apartment, error: aptError } = await supabase
-      .from('apartments')
+    const { data: apartment, error: aptError } = await getSupabaseClient()`n      .from('apartments')
       .select('*')
       .eq('id', apartmentId)
       .single();
@@ -58,8 +57,7 @@ export async function POST(request: NextRequest) {
     const totalAmount = depositAmount + firstMonthRent;
 
     // 3. Create booking record
-    const { data: booking, error: bookingError } = await supabase
-      .from('bookings')
+    const { data: booking, error: bookingError } = await getSupabaseClient()`n      .from('bookings')
       .insert({
         apartment_id: apartmentId,
         user_id: userId,
@@ -117,8 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Store payment intent ID in booking
-    await supabase
-      .from('bookings')
+    await getSupabaseClient()`n      .from('bookings')
       .update({ payment_intent_id: paymentIntent.id })
       .eq('id', booking.id);
 

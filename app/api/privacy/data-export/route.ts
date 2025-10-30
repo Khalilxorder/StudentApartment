@@ -36,8 +36,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Get user profile
-    const { data: profile } = await supabase
-      .from('user_profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();
@@ -47,8 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user apartments (if owner)
-    const { data: apartments } = await supabase
-      .from('apartments')
+    const { data: apartments } = await getSupabaseClient()`n      .from('apartments')
       .select('*')
       .eq('owner_id', userId);
 
@@ -57,8 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user reviews
-    const { data: reviews } = await supabase
-      .from('reviews')
+    const { data: reviews } = await getSupabaseClient()`n      .from('reviews')
       .select('*')
       .eq('user_id', userId);
 
@@ -67,8 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user saved searches
-    const { data: savedSearches } = await supabase
-      .from('saved_searches')
+    const { data: savedSearches } = await getSupabaseClient()`n      .from('saved_searches')
       .select('*')
       .eq('user_id', userId);
 
@@ -77,8 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user messages
-    const { data: messages } = await supabase
-      .from('messages')
+    const { data: messages } = await getSupabaseClient()`n      .from('messages')
       .select('*')
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
 
@@ -87,8 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user notifications
-    const { data: notifications } = await supabase
-      .from('notifications')
+    const { data: notifications } = await getSupabaseClient()`n      .from('notifications')
       .select('*')
       .eq('user_id', userId);
 

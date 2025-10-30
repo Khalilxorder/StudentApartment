@@ -74,8 +74,7 @@ async function handleUserReport(supabase: any, reporterId: string, targetUserId:
   }
 
   // Insert report
-  const { error } = await supabase
-    .from('user_reports')
+  const { error } = await getSupabaseClient()`n    .from('user_reports')
     .insert({
       reporter_id: reporterId,
       target_user_id: targetUserId,
@@ -105,8 +104,7 @@ async function handleContentModeration(supabase: any, userId: string, content: a
 
   if (moderationResult.flagged) {
     // Log moderated content
-    await supabase
-      .from('content_moderation')
+    await getSupabaseClient()`n      .from('content_moderation')
       .insert({
         user_id: userId,
         content_type: content.type || 'text',
@@ -127,8 +125,7 @@ async function handleContentModeration(supabase: any, userId: string, content: a
 
 async function handleSuspiciousActivity(supabase: any, reporterId: string, targetUserId: string, reason: string) {
   // Log suspicious activity
-  const { error } = await supabase
-    .from('suspicious_activity')
+  const { error } = await getSupabaseClient()`n    .from('suspicious_activity')
     .insert({
       reporter_id: reporterId,
       target_user_id: targetUserId,
@@ -164,8 +161,7 @@ async function performSafetyCheck(supabase: any, userId: string) {
 
 async function getUserReports(supabase: any, userId: string) {
   // Check if user is admin
-  const { data: profile } = await supabase
-    .from('user_profiles')
+  const { data: profile } = await getSupabaseClient()`n    .from('user_profiles')
     .select('user_type')
     .eq('user_id', userId)
     .single();
@@ -174,8 +170,7 @@ async function getUserReports(supabase: any, userId: string) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const { data: reports, error } = await supabase
-    .from('user_reports')
+  const { data: reports, error } = await getSupabaseClient()`n    .from('user_reports')
     .select(`
       *,
       reporter:user_profiles!user_reports_reporter_id_fkey(first_name, last_name),
@@ -211,8 +206,7 @@ async function calculateTrustScore(supabase: any, userId: string) {
   let score = 50; // Base score
 
   // Factor 1: Verification status
-  const { data: profile } = await supabase
-    .from('user_profiles')
+  const { data: profile } = await getSupabaseClient()`n    .from('user_profiles')
     .select('identity_verified, background_check_completed, onboarding_completed')
     .eq('user_id', userId)
     .single();
@@ -222,8 +216,7 @@ async function calculateTrustScore(supabase: any, userId: string) {
   if (profile?.onboarding_completed) score += 10;
 
   // Factor 2: Reports against user (negative)
-  const { count: reportCount } = await supabase
-    .from('user_reports')
+  const { count: reportCount } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true })
     .eq('target_user_id', userId);
 
@@ -248,8 +241,7 @@ async function updateTrustScore(supabase: any, userId: string, change: number) {
   const newScore = Math.max(0, Math.min(100, currentScore + change));
 
   // Store trust score history
-  await supabase
-    .from('trust_scores')
+  await getSupabaseClient()`n    .from('trust_scores')
     .insert({
       user_id: userId,
       score: newScore,
@@ -270,8 +262,7 @@ async function performComprehensiveSafetyCheck(supabase: any, userId: string) {
   };
 
   // Get user profile
-  const { data: profile } = await supabase
-    .from('user_profiles')
+  const { data: profile } = await getSupabaseClient()`n    .from('user_profiles')
     .select('identity_verified, background_check_completed, created_at')
     .eq('user_id', userId)
     .single();
@@ -285,8 +276,7 @@ async function performComprehensiveSafetyCheck(supabase: any, userId: string) {
 
   // Check recent reports
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { count: recentReports } = await supabase
-    .from('user_reports')
+  const { count: recentReports } = await getSupabaseClient()`n    .from('user_reports')
     .select('*', { count: 'exact', head: true })
     .eq('target_user_id', userId)
     .gte('reported_at', sevenDaysAgo);

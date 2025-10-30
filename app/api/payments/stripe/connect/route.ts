@@ -20,8 +20,7 @@ export async function POST(request: NextRequest) {
     const { userId, email, country = 'HU', businessName } = body;
 
     // Check if user already has a connected account
-    const { data: existing } = await supabase
-      .from('stripe_connect_accounts')
+    const { data: existing } = await getSupabaseClient()`n      .from('stripe_connect_accounts')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -50,8 +49,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Store in database
-    const { error: insertError } = await supabase
-      .from('stripe_connect_accounts')
+    const { error: insertError } = await getSupabaseClient()`n      .from('stripe_connect_accounts')
       .insert({
         user_id: userId,
         stripe_account_id: account.id,
@@ -110,8 +108,7 @@ export async function GET(
     const supabase = createServiceClient();
     const { userId } = params;
 
-    const { data: account, error } = await supabase
-      .from('stripe_connect_accounts')
+    const { data: account, error } = await getSupabaseClient()`n      .from('stripe_connect_accounts')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -139,8 +136,7 @@ export async function GET(
 
     // Update status in DB if changed
     if (stripeAccount.charges_enabled && account.status !== 'active') {
-      await supabase
-        .from('stripe_connect_accounts')
+      await getSupabaseClient()`n        .from('stripe_connect_accounts')
         .update({ status: 'active', updated_at: new Date().toISOString() })
         .eq('user_id', userId);
     }

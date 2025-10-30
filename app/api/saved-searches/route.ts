@@ -16,8 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: savedSearches, error } = await supabase
-      .from('saved_searches')
+    const { data: savedSearches, error } = await getSupabaseClient()`n      .from('saved_searches')
       .select(`
         *,
         search_results (
@@ -90,8 +89,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Create saved search
-    const { data: savedSearch, error: insertError } = await supabase
-      .from('saved_searches')
+    const { data: savedSearch, error: insertError } = await getSupabaseClient()`n      .from('saved_searches')
       .insert({
         user_id: user.id,
         name,
@@ -123,8 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Run initial search to populate results
-    const { data: initialResults } = await supabase
-      .rpc('run_saved_search', { target_search_id: savedSearch.id });
+    const { data: initialResults } = await getSupabaseClient()`n      .rpc('run_saved_search', { target_search_id: savedSearch.id });
 
     return NextResponse.json({
       savedSearch,

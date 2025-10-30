@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+// Lazy-load Supabase client
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 interface ModerationActionRequest {
   reportId: string;
@@ -32,8 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get report details
-    const { data: report, error: reportError } = await supabase
-      .from('user_reports')
+    const { data: report, error: reportError } = await getSupabaseClient()`n      .from('user_reports')
       .select('*')
       .eq('id', reportId)
       .single();
@@ -46,8 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update report status
-    const { error: updateError } = await supabase
-      .from('user_reports')
+    const { error: updateError } = await getSupabaseClient()`n      .from('user_reports')
       .update({
         status: action,
         resolved_by: moderatorId,
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       const restrictionUntil = new Date();
       restrictionUntil.setDate(restrictionUntil.getDate() + restrictionDuration);
 
-      await supabase.from('user_restrictions').insert({
+      await getSupabaseClient().from('user_restrictions').insert({
         user_id: report.target_id,
         restriction_type: 'content_removed',
         reason: report.reason,
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Log moderation action
-      await supabase.from('moderation_logs').insert({
+      await getSupabaseClient().from('moderation_logs').insert({
         action: 'user_restricted',
         target_user_id: report.target_id,
         moderator_id: moderatorId,

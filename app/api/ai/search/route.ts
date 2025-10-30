@@ -16,8 +16,7 @@ export async function POST(request: NextRequest) {
     const supabase = createClient();
 
     // Get all available apartments with basic filters
-    let apartmentsQuery = supabase
-      .from('apartments')
+    let apartmentsQuery = getSupabaseClient()`n      .from('apartments')
       .select('*')
       .eq('is_available', true);
 

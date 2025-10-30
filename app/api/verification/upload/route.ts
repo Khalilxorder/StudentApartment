@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName);
 
     // Save verification record
-    const { error: insertError } = await supabase
-      .from('user_verifications')
+    const { error: insertError } = await getSupabaseClient()`n      .from('user_verifications')
       .insert({
         user_id: user.id,
         document_type: documentType,
@@ -72,8 +71,7 @@ export async function POST(request: NextRequest) {
     const aiAnalysis = await performAIDocumentAnalysis(publicUrl, documentType, user.id);
 
     // Update verification record with AI analysis results
-    const { error: analysisUpdateError } = await supabase
-      .from('user_verifications')
+    const { error: analysisUpdateError } = await getSupabaseClient()`n      .from('user_verifications')
       .update({
         ai_analysis: aiAnalysis,
         status: aiAnalysis.isValid ? 'approved' : 'pending',
@@ -90,8 +88,7 @@ export async function POST(request: NextRequest) {
 
     // Update user profile based on AI analysis
     if (aiAnalysis.isValid) {
-      const { error: profileUpdateError } = await supabase
-        .from('user_profiles')
+      const { error: profileUpdateError } = await getSupabaseClient()`n        .from('user_profiles')
         .update({
           identity_verified: documentType === 'id_card' || documentType === 'passport',
           background_check_completed: documentType === 'background_check',
@@ -137,8 +134,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's verification status
-    const { data: verifications, error } = await supabase
-      .from('user_verifications')
+    const { data: verifications, error } = await getSupabaseClient()`n      .from('user_verifications')
       .select('*')
       .eq('user_id', user.id)
       .order('submitted_at', { ascending: false });
@@ -149,8 +145,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user profile verification status
-    const { data: profile } = await supabase
-      .from('user_profiles')
+    const { data: profile } = await getSupabaseClient()`n      .from('user_profiles')
       .select('identity_verified, background_check_completed, user_type')
       .eq('user_id', user.id)
       .single();
@@ -215,8 +210,7 @@ async function performAIDocumentAnalysis(
 
   // Get user context for cross-validation
   const supabase = createClient();
-  const { data: profile } = await supabase
-    .from('user_profiles')
+  const { data: profile } = await getSupabaseClient()`n    .from('user_profiles')
     .select('first_name, last_name')
     .eq('user_id', userId)
     .single();
