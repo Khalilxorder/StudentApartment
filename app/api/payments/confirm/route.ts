@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get payment intent details from DB
-    const { data: intentRecord, error: fetchError } = await getSupabaseClient()`n      .from('payment_intents')
+    const { data: intentRecord, error: fetchError } = await supabase
+      .from('payment_intents')
       .select('*')
       .eq('stripe_payment_intent_id', paymentIntentId)
       .single();
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest) {
     // If already succeeded, return success
     if (intent.status === 'succeeded') {
       // Update booking status to paid
-      await getSupabaseClient()`n        .from('bookings')
+      await supabase
+        .from('bookings')
         .update({ payment_status: 'completed' })
         .eq('id', intentRecord.booking_id);
 
@@ -98,7 +100,8 @@ export async function POST(request: NextRequest) {
       });
 
       // Update booking status to paid
-      await getSupabaseClient()`n        .from('bookings')
+      await supabase
+        .from('bookings')
         .update({ payment_status: 'completed' })
         .eq('id', intentRecord.booking_id);
 

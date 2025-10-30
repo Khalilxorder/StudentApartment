@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     const supabase = createClient();
 
     // Build query based on sort criteria
-    let query = getSupabaseClient()`n      .from('reviews')
+    let query = supabase
+      .from('reviews')
       .select(`
         *,
         review_photos (
@@ -98,7 +99,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get review analytics
-    const { data: analytics } = await getSupabaseClient()`n      .from('review_analytics')
+    const { data: analytics } = await supabase
+      .from('review_analytics')
       .select('*')
       .eq('apartment_id', apartmentId)
       .single();
@@ -163,7 +165,8 @@ export async function POST(request: NextRequest) {
 
     // Verify user has a completed booking for this apartment (if bookingId provided)
     if (reviewData.bookingId) {
-      const { data: booking, error: bookingError } = await getSupabaseClient()`n        .from('bookings')
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
         .select('id, payment_status, user_id')
         .eq('id', reviewData.bookingId)
         .eq('apartment_id', reviewData.apartmentId)
@@ -192,7 +195,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already reviewed this apartment
-    const { data: existingReview } = await getSupabaseClient()`n      .from('reviews')
+    const { data: existingReview } = await supabase
+      .from('reviews')
       .select('id')
       .eq('apartment_id', reviewData.apartmentId)
       .eq('user_id', user.id)
@@ -206,7 +210,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create review
-    const { data: review, error: reviewError } = await getSupabaseClient()`n      .from('reviews')
+    const { data: review, error: reviewError } = await supabase
+      .from('reviews')
       .insert({
         apartment_id: reviewData.apartmentId,
         user_id: user.id,
@@ -247,7 +252,8 @@ export async function POST(request: NextRequest) {
         sort_order: index
       }));
 
-      const { error: photoError } = await getSupabaseClient()`n        .from('review_photos')
+      const { error: photoError } = await supabase
+        .from('review_photos')
         .insert(photoInserts);
 
       if (photoError) {

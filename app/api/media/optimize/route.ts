@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 interface OptimizeRequest {
   mediaIds?: string[];
@@ -25,7 +22,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'processing';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    const { data, error } = await getSupabaseClient()`n      .from('media_processing_jobs')
+    const { data, error } = await supabase
+      .from('media_processing_jobs')
       .select('*')
       .eq('status', status)
       .order('created_at', { ascending: false })
@@ -66,7 +64,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch media records
-    const { data: mediaFiles, error: fetchError } = await getSupabaseClient()`n      .from('media_uploads')
+    const { data: mediaFiles, error: fetchError } = await supabase
+      .from('media_uploads')
       .select('*')
       .in('id', mediaIds);
 
@@ -94,7 +93,8 @@ export async function POST(request: NextRequest) {
       },
     }));
 
-    const { data: createdJobs, error: insertError } = await getSupabaseClient()`n      .from('media_processing_jobs')
+    const { data: createdJobs, error: insertError } = await supabase
+      .from('media_processing_jobs')
       .insert(jobs)
       .select();
 

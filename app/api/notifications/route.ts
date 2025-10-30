@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user notification preferences
-    const { data: preferences } = await getSupabaseClient()`n      .from('user_notification_preferences')
+    const { data: preferences } = await supabase
+      .from('user_notification_preferences')
       .select('*')
       .eq('user_id', data.user_id)
       .single();
@@ -56,7 +57,8 @@ export async function POST(request: NextRequest) {
       const scheduledTime = new Date(data.scheduled_for);
       if (scheduledTime > new Date()) {
         // Schedule for later
-        const { error } = await getSupabaseClient()`n          .from('scheduled_notifications')
+        const { error } = await supabase
+          .from('scheduled_notifications')
           .insert({
             user_id: data.user_id,
             template_id: data.template_name ? await getTemplateId(data.template_name) : null,
@@ -78,7 +80,8 @@ export async function POST(request: NextRequest) {
 
     if (success) {
       // Log the notification
-      await getSupabaseClient()`n        .from('notifications')
+      await supabase
+        .from('notifications')
         .insert({
           user_id: data.user_id,
           type: data.type,
@@ -109,7 +112,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'user_id parameter required' }, { status: 400 });
     }
 
-    let query = getSupabaseClient()`n      .from('notifications')
+    let query = supabase
+      .from('notifications')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -145,7 +149,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'mark_read') {
-      const { error } = await getSupabaseClient()`n        .from('notifications')
+      const { error } = await supabase
+        .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .in('id', notification_ids);
 
@@ -165,7 +170,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 async function getNotificationTemplate(templateName: string, type: string) {
-  const { data: template } = await getSupabaseClient()`n    .from('notification_templates')
+  const { data: template } = await supabase
+    .from('notification_templates')
     .select('*')
     .eq('name', templateName)
     .eq('type', type)
@@ -176,7 +182,8 @@ async function getNotificationTemplate(templateName: string, type: string) {
 }
 
 async function getTemplateId(templateName: string): Promise<string | null> {
-  const { data: template } = await getSupabaseClient()`n    .from('notification_templates')
+  const { data: template } = await supabase
+    .from('notification_templates')
     .select('id')
     .eq('name', templateName)
     .single();
@@ -219,7 +226,8 @@ async function sendNotification(
 ): Promise<boolean> {
   try {
     // Get user contact information
-    const { data: user } = await getSupabaseClient()`n      .from('user_profiles')
+    const { data: user } = await supabase
+      .from('user_profiles')
       .select('email, phone')
       .eq('user_id', userId)
       .single();

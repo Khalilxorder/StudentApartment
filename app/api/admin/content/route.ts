@@ -4,7 +4,8 @@ import { supabase } from '@/utils/supabaseClient';
 export async function GET() {
   try {
     // Get all content moderation items
-    const { data: contentItems, error } = await getSupabaseClient()`n      .from('content_moderation')
+    const { data: contentItems, error } = await supabase
+      .from('content_moderation')
       .select(`
         id,
         content_type,
@@ -45,7 +46,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update the content moderation status
-    const { error: moderationError } = await getSupabaseClient()`n      .from('content_moderation')
+    const { error: moderationError } = await supabase
+      .from('content_moderation')
       .update({
         status,
         reviewed_at: new Date().toISOString(),
@@ -64,7 +66,8 @@ export async function PATCH(request: NextRequest) {
     // This would depend on the content type and your business logic
 
     // Log the admin action
-    await getSupabaseClient()`n      .from('audit_logs')
+    await supabase
+      .from('audit_logs')
       .insert({
         action: `content_${status}`,
         details: { content_id: contentId, admin_notes: adminNotes },

@@ -6,18 +6,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const { data: { user }, error: authError } = await getSupabaseClient().auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -26,7 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's verifications
-    const { data: verifications, error } = await getSupabaseClient()`n      .from('verifications')
+    const { data: verifications, error } = await supabase
+      .from('verifications')
       .select(`
         id,
         document_type,

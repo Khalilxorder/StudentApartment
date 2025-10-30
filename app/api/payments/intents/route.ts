@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -58,7 +55,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Store in database
-    await getSupabaseClient().from('payment_intents').insert({
+    await supabase.from('payment_intents').insert({
       booking_id: bookingId,
       stripe_payment_intent_id: intent.id,
       amount_cents: intent.amount,
@@ -99,7 +96,8 @@ export async function GET(
   try {
     const { id } = params;
 
-    const { data: intentRecord, error } = await getSupabaseClient()`n      .from('payment_intents')
+    const { data: intentRecord, error } = await supabase
+      .from('payment_intents')
       .select('*')
       .eq('stripe_payment_intent_id', id)
       .single();

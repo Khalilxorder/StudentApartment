@@ -6,13 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check authentication
-    const { data: { user }, error: authError } = await getSupabaseClient().auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user || user.id !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -53,7 +50,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has a pending verification
-    const { data: existingVerification } = await getSupabaseClient()`n      .from('verifications')
+    const { data: existingVerification } = await supabase
+      .from('verifications')
       .select('id, status')
       .eq('user_id', userId)
       .eq('status', 'pending')
@@ -67,7 +65,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert verification record
-    const { data: verification, error } = await getSupabaseClient()`n      .from('verifications')
+    const { data: verification, error } = await supabase
+      .from('verifications')
       .insert({
         user_id: userId,
         document_type: documentType,

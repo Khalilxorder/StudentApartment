@@ -320,7 +320,8 @@ class MediaService {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      const { count, error } = await getSupabaseClient()`n        .from('apartment_media')
+      const { count, error } = await supabase
+        .from('apartment_media')
         .select('*', { count: 'exact', head: true })
         .eq('apartment_id', apartmentId);
 

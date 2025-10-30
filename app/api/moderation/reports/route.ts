@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 interface ContentReportRequest {
   reporterId: string;
@@ -27,7 +24,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'pending';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    const { data, error } = await getSupabaseClient()`n      .from('user_reports')
+    const { data, error } = await supabase
+      .from('user_reports')
       .select('*')
       .eq('status', status)
       .order('created_at', { ascending: false })
@@ -71,7 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already reported by same user
-    const { data: existing } = await getSupabaseClient()`n      .from('user_reports')
+    const { data: existing } = await supabase
+      .from('user_reports')
       .select('*')
       .eq('reporter_id', reporterId)
       .eq('target_user_id', targetId)
@@ -86,7 +85,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create report
-    const { data: report, error: createError } = await getSupabaseClient()`n      .from('user_reports')
+    const { data: report, error: createError } = await supabase
+      .from('user_reports')
       .insert({
         reporter_id: reporterId,
         target_user_id: targetId,

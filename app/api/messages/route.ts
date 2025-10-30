@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
 
     if (conversationId) {
       // Get messages for a specific conversation
-      const { data: messages, error } = await getSupabaseClient()`n        .from('messages')
+      const { data: messages, error } = await supabase
+        .from('messages')
         .select(`
           id,
           content,
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Mark messages as read
-      await getSupabaseClient()`n        .from('messages')
+      await supabase
+        .from('messages')
         .update({ read: true })
         .eq('conversation_id', conversationId)
         .eq('receiver_id', user.id)
@@ -62,14 +64,16 @@ export async function GET(request: NextRequest) {
       const conversationId = [user.id, otherUserId].sort().join('_');
 
       // Check if conversation exists
-      const { data: existingMessages } = await getSupabaseClient()`n        .from('messages')
+      const { data: existingMessages } = await supabase
+        .from('messages')
         .select('id')
         .eq('conversation_id', conversationId)
         .limit(1);
 
       if (!existingMessages || existingMessages.length === 0) {
         // Create conversation record if it doesn't exist
-        await getSupabaseClient()`n          .from('conversations')
+        await supabase
+          .from('conversations')
           .upsert({
             id: conversationId,
             participant1_id: user.id,
@@ -79,7 +83,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Get conversation messages
-      const { data: messages, error } = await getSupabaseClient()`n        .from('messages')
+      const { data: messages, error } = await supabase
+        .from('messages')
         .select(`
           id,
           content,
@@ -119,7 +124,8 @@ export async function GET(request: NextRequest) {
       const transformedConversations = await cache.getOrSet(
         cacheKey,
         async () => {
-          const { data: conversations, error } = await getSupabaseClient()`n            .from('conversations')
+          const { data: conversations, error } = await supabase
+            .from('conversations')
             .select(`
               id,
               last_message_at,
@@ -227,7 +233,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Create or get existing conversation
-      const { data: newConversationId, error: convError } = await getSupabaseClient()`n        .rpc('get_or_create_conversation', {
+      const { data: newConversationId, error: convError } = await supabase
+        .rpc('get_or_create_conversation', {
           p_apartment_id: apartmentId,
           p_participant1_id: user.id,
           p_participant2_id: receiverId
@@ -246,7 +253,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that the user is a participant in this conversation
-    const { data: conversation } = await getSupabaseClient()`n      .from('conversations')
+    const { data: conversation } = await supabase
+      .from('conversations')
       .select('participant1_id, participant2_id')
       .eq('id', finalConversationId)
       .single();
@@ -257,7 +265,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert message
-    const { data: message, error: insertError } = await getSupabaseClient()`n      .from('messages')
+    const { data: message, error: insertError } = await supabase
+      .from('messages')
       .insert({
         conversation_id: finalConversationId,
         sender_id: user.id,
@@ -285,7 +294,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update conversation last_message_at
-    await getSupabaseClient()`n      .from('conversations')
+    await supabase
+      .from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', finalConversationId);
 

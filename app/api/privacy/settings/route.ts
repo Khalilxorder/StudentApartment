@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Get user privacy settings
-    const { data: settings } = await getSupabaseClient()`n      .from('user_privacy_settings')
+    const { data: settings } = await supabase
+      .from('user_privacy_settings')
       .select('*')
       .eq('user_id', session.user.id)
       .single();
@@ -83,7 +84,8 @@ export async function PATCH(req: NextRequest) {
     const userId = session.user.id;
 
     // Update or insert privacy settings
-    const { data, error } = await getSupabaseClient()`n      .from('user_privacy_settings')
+    const { data, error } = await supabase
+      .from('user_privacy_settings')
       .upsert({
         user_id: userId,
         ...updates,

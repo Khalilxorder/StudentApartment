@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user profile
     try {
-      const { error } = await getSupabaseClient()`n        .from('user_profiles')
+      const { error } = await supabase
+        .from('user_profiles')
         .delete()
         .eq('id', userId);
 
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user's apartments
     try {
-      const { error } = await getSupabaseClient()`n        .from('apartments')
+      const { error } = await supabase
+        .from('apartments')
         .delete()
         .eq('owner_id', userId);
 
@@ -74,7 +76,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user's reviews
     try {
-      const { error } = await getSupabaseClient()`n        .from('reviews')
+      const { error } = await supabase
+        .from('reviews')
         .delete()
         .eq('user_id', userId);
 
@@ -85,7 +88,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user's messages
     try {
-      const { error } = await getSupabaseClient()`n        .from('messages')
+      const { error } = await supabase
+        .from('messages')
         .delete()
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
 
@@ -96,7 +100,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user's notifications
     try {
-      const { error } = await getSupabaseClient()`n        .from('notifications')
+      const { error } = await supabase
+        .from('notifications')
         .delete()
         .eq('user_id', userId);
 
@@ -107,7 +112,8 @@ export async function POST(req: NextRequest) {
 
     // Delete user's saved searches
     try {
-      const { error } = await getSupabaseClient()`n        .from('saved_searches')
+      const { error } = await supabase
+        .from('saved_searches')
         .delete()
         .eq('user_id', userId);
 

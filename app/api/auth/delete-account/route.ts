@@ -16,7 +16,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete user's profile data first
-    const { error: profileError } = await getSupabaseClient()`n      .from('profiles')
+    const { error: profileError } = await supabase
+      .from('profiles')
       .delete()
       .eq('id', user.id);
 
@@ -25,7 +26,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete user's favorites
-    const { error: favoritesError } = await getSupabaseClient()`n      .from('favorites')
+    const { error: favoritesError } = await supabase
+      .from('favorites')
       .delete()
       .eq('user_id', user.id);
 
@@ -34,7 +36,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete user's bookings
-    const { error: bookingsError } = await getSupabaseClient()`n      .from('bookings')
+    const { error: bookingsError } = await supabase
+      .from('bookings')
       .delete()
       .eq('user_id', user.id);
 
@@ -43,7 +46,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete user's messages
-    const { error: messagesError } = await getSupabaseClient()`n      .from('messages')
+    const { error: messagesError } = await supabase
+      .from('messages')
       .delete()
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
@@ -52,7 +56,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete user's search history
-    const { error: searchError } = await getSupabaseClient()`n      .from('search_history')
+    const { error: searchError } = await supabase
+      .from('search_history')
       .delete()
       .eq('user_id', user.id);
 

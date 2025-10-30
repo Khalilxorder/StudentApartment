@@ -4,7 +4,8 @@ import { supabase } from '@/utils/supabaseClient';
 export async function GET() {
   try {
     // Get all user profiles with their verification and trust data
-    const { data: users, error } = await getSupabaseClient()`n      .from('user_profiles')
+    const { data: users, error } = await supabase
+      .from('user_profiles')
       .select(`
         user_id,
         first_name,
@@ -48,7 +49,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update user profile
-    const { error: profileError } = await getSupabaseClient()`n      .from('user_profiles')
+    const { error: profileError } = await supabase
+      .from('user_profiles')
       .update(updates)
       .eq('user_id', userId);
 
@@ -59,7 +61,8 @@ export async function PATCH(request: NextRequest) {
 
     // If identity verification status changed, log it
     if (updates.identity_verified !== undefined) {
-      await getSupabaseClient()`n        .from('audit_logs')
+      await supabase
+        .from('audit_logs')
         .insert({
           user_id: userId,
           action: updates.identity_verified ? 'identity_verified' : 'identity_unverified',

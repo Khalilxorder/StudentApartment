@@ -9,7 +9,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // In production, save to getSupabaseClient()`n    // const { error } = await getSupabaseClient()`n    //   .from('personality_assessments')
+    // In production, save to Supabase
+    // const { error } = await supabase
+    //   .from('personality_assessments')
     //   .upsert({
     //     user_id: userId,
     //     traits: traits,

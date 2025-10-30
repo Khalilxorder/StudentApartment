@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update apartment price
-    const { error: updateError } = await getSupabaseClient()`n      .from('apartments')
+    const { error: updateError } = await supabase
+      .from('apartments')
       .update({
         price_huf: new_price,
         updated_at: new Date().toISOString(),
@@ -64,7 +65,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the price change
-    await getSupabaseClient()`n      .from('pricing_history')
+    await supabase
+      .from('pricing_history')
       .insert({
         apartment_id,
         old_price: null, // Would need to fetch current price first
@@ -84,7 +86,8 @@ export async function POST(request: NextRequest) {
 async function getPricingRecommendation(apartmentId: string): Promise<PricingRecommendation | null> {
   try {
     // Get apartment details
-    const { data: apartment, error } = await getSupabaseClient()`n      .from('apartments')
+    const { data: apartment, error } = await supabase
+      .from('apartments')
       .select('*')
       .eq('id', apartmentId)
       .single();
@@ -125,7 +128,8 @@ async function getPricingRecommendation(apartmentId: string): Promise<PricingRec
 
 async function getAllPricingRecommendations(): Promise<PricingRecommendation[]> {
   try {
-    const { data: apartments, error } = await getSupabaseClient()`n      .from('apartments')
+    const { data: apartments, error } = await supabase
+      .from('apartments')
       .select('*')
       .limit(50); // Limit for performance
 
@@ -204,13 +208,15 @@ async function calculateDemandScore(district: number): Promise<number> {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { count: searchCount } = await getSupabaseClient()`n      .from('search_queries')
+    const { count: searchCount } = await supabase
+      .from('search_queries')
       .select('*', { count: 'exact', head: true })
       .eq('district', district)
       .gte('created_at', thirtyDaysAgo.toISOString());
 
     // Count recent bookings
-    const { count: bookingCount } = await getSupabaseClient()`n      .from('bookings')
+    const { count: bookingCount } = await supabase
+      .from('bookings')
       .select('*', { count: 'exact', head: true })
       .eq('apartment_district', district)
       .gte('created_at', thirtyDaysAgo.toISOString());
@@ -252,7 +258,8 @@ function calculateSeasonalityMultiplier(): number {
 async function calculateCompetitorAdjustment(apartment: any): Promise<number> {
   try {
     // Find similar apartments in the same district
-    const { data: competitors } = await getSupabaseClient()`n      .from('apartments')
+    const { data: competitors } = await supabase
+      .from('apartments')
       .select('price_huf, bedrooms, bathrooms')
       .eq('district', apartment.district)
       .neq('id', apartment.id)

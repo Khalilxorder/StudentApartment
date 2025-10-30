@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy-load Supabase client
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 interface DigestPreferencesRequest {
   userId: string;
@@ -32,7 +29,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabaseClient()`n      .from('digest_preferences')
+    const { data, error } = await supabase
+      .from('digest_preferences')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -86,7 +84,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if preferences exist
-    const { data: existing } = await getSupabaseClient()`n      .from('digest_preferences')
+    const { data: existing } = await supabase
+      .from('digest_preferences')
       .select('id')
       .eq('user_id', userId)
       .single();
@@ -94,7 +93,8 @@ export async function POST(request: NextRequest) {
     let result;
     if (existing) {
       // Update existing
-      const { data, error } = await getSupabaseClient()`n        .from('digest_preferences')
+      const { data, error } = await supabase
+        .from('digest_preferences')
         .update({
           frequency,
           categories: categories || ['new_listings', 'price_drops'],
@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
       result = { data, error };
     } else {
       // Create new
-      const { data, error } = await getSupabaseClient()`n        .from('digest_preferences')
+      const { data, error } = await supabase
+        .from('digest_preferences')
         .insert({
           user_id: userId,
           frequency,

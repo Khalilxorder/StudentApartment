@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin (simplified check)
-    const { data: userProfile } = await getSupabaseClient()`n      .from('profiles')
+    const { data: userProfile } = await supabase
+      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -139,7 +140,8 @@ async function sendSavedSearchAlerts() {
 
   try {
     // Get all active saved searches that need alerts
-    const { data: savedSearches, error: searchError } = await getSupabaseClient()`n      .from('saved_searches')
+    const { data: savedSearches, error: searchError } = await supabase
+      .from('saved_searches')
       .select(`
         id,
         user_id,
@@ -207,7 +209,8 @@ async function sendSavedSearchAlerts() {
       // Get new apartments for each search
       const alertData: Array<{ searchName: string; searchId: string; newApartments: any[] }> = [];
       for (const search of searchesNeedingAlerts) {
-        const { data: newApartments } = await getSupabaseClient()`n          .from('search_results')
+        const { data: newApartments } = await supabase
+          .from('search_results')
           .select(`
             apartment_id,
             first_found_at,
@@ -252,7 +255,8 @@ async function sendSavedSearchAlerts() {
 
       // Update last_alert_sent_at for each search
       for (const search of searchesNeedingAlerts) {
-        await getSupabaseClient()`n          .from('saved_searches')
+        await supabase
+          .from('saved_searches')
           .update({ last_alert_sent_at: new Date().toISOString() })
           .eq('id', search.id);
 
@@ -261,7 +265,8 @@ async function sendSavedSearchAlerts() {
           .find(data => data.searchId === search.id)?.newApartments.length || 0;
 
         if (newApartmentsCount > 0) {
-          await getSupabaseClient()`n            .from('search_alerts')
+          await supabase
+            .from('search_alerts')
             .insert({
               saved_search_id: search.id,
               user_id: userId,
