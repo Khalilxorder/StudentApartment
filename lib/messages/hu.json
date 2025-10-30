@@ -27,11 +27,11 @@
     "price": "Ár",
     "bedrooms": "Szobák",
     "bathrooms": "Fürdőszobák",
-    "location": "Hely",
+    "location": "Helyszín",
     "search": "Apartmanok keresése",
     "filter": "Szűrés",
     "details": "Részletek",
-    "contact": "Tulajdonos kapcsolata"
+    "contact": "Kapcsolat a tulajdonossal"
   },
   "dashboard": {
     "title": "Irányítópult",

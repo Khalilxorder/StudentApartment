@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   # Quality: lint, type-check, tests, build
@@ -21,27 +21,22 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'pnpm'
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10
+        cache: 'npm'
 
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: npm ci
 
     - name: Run linting
-      run: pnpm run lint
+      run: npm run lint
 
     - name: Run type checking
-      run: pnpm run type-check
+      run: npm run type-check
 
     - name: Run tests
-      run: pnpm run test:ci
+      run: npm run test:ci
 
     - name: Build application
-      run: pnpm run build
+      run: npm run build
       env:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
@@ -62,24 +57,19 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'pnpm'
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10
+        cache: 'npm'
 
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: npm ci
 
     - name: Install Playwright browsers
-      run: pnpm exec playwright install --with-deps
+      run: npx playwright install --with-deps
 
     - name: Run E2E tests
-      run: pnpm run e2e
+      run: npm run e2e
 
     - name: Run accessibility tests
-      run: pnpm exec playwright test --project=accessibility
+      run: npx playwright test --project=accessibility
 
     - name: Upload E2E test results
       uses: actions/upload-artifact@v4
