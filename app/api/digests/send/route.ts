@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 interface DigestSendRequest {
   userId: string;
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('digest_sends')
       .select('*')
       .eq('user_id', userId)
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user preferences
-    const { data: preferences } = await supabase
+    const { data: preferences } = await getSupabase()
       .from('digest_preferences')
       .select('*')
       .eq('user_id', userId)
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user email
-    const { data: user } = await supabase
+    const { data: user } = await getSupabase()
       .from('users')
       .select('email')
       .eq('id', userId)
@@ -99,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // TODO: Build digest content based on type
     // For now, create the send record
-    const { data: send, error: sendError } = await supabase
+    const { data: send, error: sendError } = await getSupabase()
       .from('digest_sends')
       .insert({
         user_id: userId,

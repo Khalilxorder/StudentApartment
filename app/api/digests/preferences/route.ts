@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 interface DigestPreferencesRequest {
   userId: string;
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('digest_preferences')
       .select('*')
       .eq('user_id', userId)
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if preferences exist
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('digest_preferences')
       .select('id')
       .eq('user_id', userId)
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
     let result;
     if (existing) {
       // Update existing
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('digest_preferences')
         .update({
           frequency,
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
       result = { data, error };
     } else {
       // Create new
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('digest_preferences')
         .insert({
           user_id: userId,
