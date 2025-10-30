@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { searchService } from '../../../../services/search-svc/index';
+import { searchService } from '@/services/search-svc/index';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

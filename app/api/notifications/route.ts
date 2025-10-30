@@ -272,7 +272,7 @@ async function sendNotification(
 async function sendEmailNotification(email: string, subject: string, message: string) {
   try {
     // Import email queue service dynamically
-    const { emailQueue } = await import('../../../services/notify-svc/email-queue');
+    const { emailQueue } = await import('@/services/notify-svc/email-queue');
 
     // Queue email for asynchronous sending
     const job = await emailQueue.addEmailJob({
