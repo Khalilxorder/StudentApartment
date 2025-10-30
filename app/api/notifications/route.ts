@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabaseClient';
 import { Resend } from 'resend';
+import { emailQueue } from '@/services/notify-svc/email-queue';
 
 // Initialize Resend for email notifications
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -271,9 +272,6 @@ async function sendNotification(
 
 async function sendEmailNotification(email: string, subject: string, message: string) {
   try {
-    // Import email queue service dynamically
-    const { emailQueue } = await import('@/services/notify-svc/email-queue');
-
     // Queue email for asynchronous sending
     const job = await emailQueue.addEmailJob({
       to: email,
