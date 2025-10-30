@@ -59,10 +59,18 @@ export class ABTestingService {
   private supabase: any;
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialization - only create client when needed
+    this.supabase = null;
+  }
+
+  private getClient() {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
   }
 
   /**
@@ -73,7 +81,9 @@ export class ABTestingService {
       // Validate experiment configuration
       this.validateExperiment(experiment);
 
-      const { data: newExperiment, error } = await this.supabase
+      const supabase = this.getClient();
+
+      const { data: newExperiment, error } = await this.getClient()
         .from('experiments')
         .insert({
           name: experiment.name,
@@ -127,7 +137,7 @@ export class ABTestingService {
   async assignUserToExperiment(userId: string, experimentId: string): Promise<string> {
     try {
       // Check if user is already assigned
-      const { data: existingAssignment } = await this.supabase
+      const { data: existingAssignment } = await this.getClient()
         .from('user_experiments')
         .select('variant_id')
         .eq('user_id', userId)
@@ -139,7 +149,7 @@ export class ABTestingService {
       }
 
       // Get experiment
-      const { data: experiment, error } = await this.supabase
+      const { data: experiment, error } = await this.getClient()
         .from('experiments')
         .select('*')
         .eq('id', experimentId)
@@ -159,7 +169,7 @@ export class ABTestingService {
       const variantId = this.assignVariant(userId, experiment.variants);
 
       // Store assignment
-      await this.supabase
+      await this.getClient()
         .from('user_experiments')
         .insert({
           user_id: userId,
@@ -201,7 +211,7 @@ export class ABTestingService {
   private async userMatchesAudience(userId: string, audience: any): Promise<boolean> {
     try {
       // Get user profile
-      const { data: profile, error } = await this.supabase
+      const { data: profile, error } = await this.getClient()
         .from('profiles')
         .select('user_type, country')
         .eq('id', userId)
@@ -237,7 +247,7 @@ export class ABTestingService {
    */
   async getUserVariant(userId: string, experimentId: string): Promise<string | null> {
     try {
-      const { data: assignment, error } = await this.supabase
+      const { data: assignment, error } = await this.getClient()
         .from('user_experiments')
         .select('variant_id')
         .eq('user_id', userId)
@@ -269,7 +279,7 @@ export class ABTestingService {
       if (!variantId) return; // User not in experiment
 
       // Store event
-      await this.supabase
+      await this.getClient()
         .from('experiment_events')
         .insert({
           user_id: userId,
@@ -290,7 +300,7 @@ export class ABTestingService {
   async getExperimentResults(experimentId: string): Promise<ExperimentResult[]> {
     try {
       // Get experiment
-      const { data: experiment, error } = await this.supabase
+      const { data: experiment, error } = await this.getClient()
         .from('experiments')
         .select('*')
         .eq('id', experimentId)
@@ -304,7 +314,7 @@ export class ABTestingService {
 
       for (const variant of experiment.variants) {
         // Count users in variant
-        const { data: userCount } = await this.supabase
+        const { data: userCount } = await this.getClient()
           .from('user_experiments')
           .select('user_id', { count: 'exact' })
           .eq('experiment_id', experimentId)
@@ -315,7 +325,7 @@ export class ABTestingService {
         let totalConversions = 0;
 
         for (const metric of experiment.metrics) {
-          const { data: eventCount } = await this.supabase
+          const { data: eventCount } = await this.getClient()
             .from('experiment_events')
             .select('id', { count: 'exact' })
             .eq('experiment_id', experimentId)
@@ -371,7 +381,7 @@ export class ABTestingService {
    */
   async startExperiment(experimentId: string): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.getClient()
         .from('experiments')
         .update({
           status: 'running',
@@ -392,7 +402,7 @@ export class ABTestingService {
    */
   async stopExperiment(experimentId: string): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.getClient()
         .from('experiments')
         .update({
           status: 'completed',
@@ -413,7 +423,7 @@ export class ABTestingService {
    */
   async getActiveExperiments(userId: string): Promise<Experiment[]> {
     try {
-      const { data: experiments, error } = await this.supabase
+      const { data: experiments, error } = await this.getClient()
         .from('experiments')
         .select('*')
         .eq('status', 'running');
@@ -456,7 +466,7 @@ export class ABTestingService {
     try {
       const variantId = await this.assignUserToExperiment(userId, experimentId);
 
-      const { data: experiment, error } = await this.supabase
+      const { data: experiment, error } = await this.getClient()
         .from('experiments')
         .select('variants')
         .eq('id', experimentId)
