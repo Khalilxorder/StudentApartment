@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/utils/supabaseClient';
 import { Resend } from 'resend';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Lazy-load Resend for email notifications
+function getResend() {
+  return process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+}
 
 /**
  * Email queue for managing alert delivery
@@ -51,6 +54,7 @@ function startQueueProcessor() {
   queueProcessingTimer = setInterval(async () => {
     while (emailQueue.length > 0) {
       const emailJob = emailQueue[0];
+      const resend = getResend();
 
       try {
         if (resend) {
@@ -302,6 +306,8 @@ async function sendSavedSearchAlerts() {
 
 // Send alert email using Resend
 async function sendAlertEmail(email: string, alertData: any[]) {
+  const resend = getResend();
+  
   if (!resend) {
     console.warn('Resend API key not configured, skipping email send');
     return { success: false, error: 'Email service not configured' };

@@ -3,8 +3,10 @@ import { supabase } from '@/utils/supabaseClient';
 import { Resend } from 'resend';
 import { emailQueue } from '@/services/notify-svc/email-queue';
 
-// Initialize Resend for email notifications
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Lazy-load Resend for email notifications
+function getResend() {
+  return process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+}
 
 interface NotificationData {
   user_id: string;
