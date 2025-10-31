@@ -28,13 +28,20 @@ export interface ProcessedMedia {
 }
 
 export class MediaPipelineService {
-  private supabase: any;
+  private supabase: any = null;
+
+  private getSupabase() {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
+  }
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialization
   }
 
   /**
@@ -75,7 +82,7 @@ export class MediaPipelineService {
 
       // Upload optimized image
       const optimizedPath = `apartments/${apartmentId}/${fileId}_optimized.webp`;
-      const { data: optimizedUpload, error: optimizedError } = await this.supabase.storage
+      const { data: optimizedUpload, error: optimizedError } = await this.getSupabase().storage
         .from('apartment-media')
         .upload(optimizedPath, optimizedBuffer, {
           contentType: 'image/webp',
@@ -93,7 +100,7 @@ export class MediaPipelineService {
           .toBuffer();
 
         const thumbnailPath = `apartments/${apartmentId}/${fileId}_thumb.webp`;
-        const { data: thumbUpload, error: thumbError } = await this.supabase.storage
+        const { data: thumbUpload, error: thumbError } = await this.getSupabase().storage
           .from('apartment-media')
           .upload(thumbnailPath, thumbnailBuffer, {
             contentType: 'image/webp',
@@ -213,14 +220,14 @@ export class MediaPipelineService {
       const filePath = urlParts.slice(-3).join('/'); // apartments/{id}/{filename}
 
       // Delete from storage
-      await this.supabase.storage
+      await this.getSupabase().storage
         .from('apartment-media')
         .remove([filePath]);
 
       if (media.thumbnail_url) {
         const thumbParts = media.thumbnail_url.split('/');
         const thumbPath = thumbParts.slice(-3).join('/');
-        await this.supabase.storage
+        await this.getSupabase().storage
           .from('apartment-media')
           .remove([thumbPath]);
       }
@@ -284,7 +291,7 @@ export class MediaPipelineService {
 
       // Upload avatar
       const avatarPath = `profiles/${userId}/${fileId}_avatar.webp`;
-      const { error: uploadError } = await this.supabase.storage
+      const { error: uploadError } = await this.getSupabase().storage
         .from('profile-media')
         .upload(avatarPath, avatarBuffer, {
           contentType: 'image/webp',

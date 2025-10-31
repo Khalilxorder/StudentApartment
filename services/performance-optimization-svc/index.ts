@@ -54,16 +54,22 @@ export interface PerformanceReport {
 }
 
 export class PerformanceOptimizationService {
-  private supabase: any;
+  private supabase: any = null;
   private memoryCache = new Map<string, CacheEntry>();
   private optimizationRules: OptimizationRule[] = [];
 
+  private getSupabase() {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
+  }
+
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    this.loadOptimizationRules();
+    // Lazy initialization - don't call getSupabase() here
   }
 
   /**

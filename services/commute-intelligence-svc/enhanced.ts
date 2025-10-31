@@ -32,14 +32,21 @@ export interface University {
 }
 
 export class CommuteIntelligenceService {
-  private supabase: any;
+  private supabase: any = null;
   private commuteCacheMinutes = 1440; // 24 hours
 
+  private getSupabase() {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
+  }
+
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialization
   }
 
   /**
@@ -374,7 +381,7 @@ export class CommuteIntelligenceService {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    await this.supabase.from('commute_cache').insert({
+    await this.getSupabase().from('commute_cache').insert({
       from_lat: query.fromLat,
       from_lng: query.fromLng,
       to_lat: query.toLat,

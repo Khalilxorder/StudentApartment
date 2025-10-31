@@ -30,17 +30,22 @@ export interface University {
 }
 
 export class CommuteIntelligenceService {
-  private supabase: any;
+  private supabase: any = null;
   private gtfsData: any = null;
   private universities: University[] = [];
 
+  private getSupabase() {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
+  }
+
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    this.loadGTFSData();
-    this.loadUniversities();
+    // Lazy initialization - don't call getSupabase() or load data here
   }
 
   /**
