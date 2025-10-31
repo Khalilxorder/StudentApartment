@@ -4,19 +4,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { stripe } from '@/lib/stripe/server';
 
-const supabase = createServerClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  return getSupabaseClient();
+}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { userId: string } }
 ) {
   try {
+    const supabase = getSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -108,6 +108,7 @@ export async function GET(
   { params }: { params: { userId: string } }
 ) {
   try {
+    const supabase = getSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
