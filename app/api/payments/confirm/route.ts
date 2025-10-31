@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { stripe } from '@/lib/stripe/server';
 
-const supabase = createServerClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  return getSupabaseClient();
+}
 
 interface ConfirmPaymentRequest {
   paymentIntentId: string;
@@ -18,6 +17,8 @@ interface ConfirmPaymentRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
+    
     if (!stripe) {
       return NextResponse.json(
         { error: 'Stripe not configured' },
