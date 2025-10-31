@@ -103,7 +103,7 @@ export class PaymentsService {
       const { apartmentId, tenantId, checkInDate, checkOutDate, guestCount } = bookingRequest;
 
       // Get apartment details
-      const { data: apartment, error: aptError } = await this.supabase
+      const { data: apartment, error: aptError } = await this.getSupabase()
         .from('apartments')
         .select('*, profiles!owner_id(*)')
         .eq('id', apartmentId)
@@ -140,7 +140,7 @@ export class PaymentsService {
       );
 
       // Create booking record
-      const { data: booking, error: bookingError } = await this.supabase
+      const { data: booking, error: bookingError } = await this.getSupabase()
         .from('bookings')
         .insert({
           apartment_id: apartmentId,
@@ -190,7 +190,7 @@ export class PaymentsService {
     checkOutDate: Date
   ): Promise<boolean> {
     try {
-      const { data: conflictingBookings, error } = await this.supabase
+      const { data: conflictingBookings, error } = await this.getSupabase()
         .from('bookings')
         .select('id')
         .eq('apartment_id', apartmentId)
@@ -213,7 +213,7 @@ export class PaymentsService {
   async getOrCreateStripeAccount(userId: string): Promise<any> {
     try {
       // Check if user already has a Stripe account
-      const { data: existingAccount, error: accountError } = await this.supabase
+      const { data: existingAccount, error: accountError } = await this.getSupabase()
         .from('stripe_accounts')
         .select('*')
         .eq('user_id', userId)
@@ -236,7 +236,7 @@ export class PaymentsService {
       });
 
       // Store account in database
-      const { data: savedAccount, error: saveError } = await this.supabase
+      const { data: savedAccount, error: saveError } = await this.getSupabase()
         .from('stripe_accounts')
         .insert({
           user_id: userId,
@@ -260,7 +260,7 @@ export class PaymentsService {
    * Get user email for Stripe account
    */
   private async getUserEmail(userId: string): Promise<string> {
-    const { data: profile, error } = await this.supabase
+    const { data: profile, error } = await this.getSupabase()
       .from('profiles')
       .select('email')
       .eq('id', userId)
@@ -303,7 +303,7 @@ export class PaymentsService {
 
       if (paymentIntent.status === 'succeeded') {
         // Update booking status
-        const { error } = await this.supabase
+        const { error } = await this.getSupabase()
           .from('bookings')
           .update({ status: 'confirmed' })
           .eq('payment_intent_id', paymentIntentId);
@@ -315,7 +315,7 @@ export class PaymentsService {
 
       } else if (paymentIntent.status === 'canceled') {
         // Update booking status to cancelled
-        const { error } = await this.supabase
+        const { error } = await this.getSupabase()
           .from('bookings')
           .update({ status: 'cancelled' })
           .eq('payment_intent_id', paymentIntentId);
@@ -335,7 +335,7 @@ export class PaymentsService {
   private async createTransfer(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     try {
       // Get booking details
-      const { data: booking, error: bookingError } = await this.supabase
+      const { data: booking, error: bookingError } = await this.getSupabase()
         .from('bookings')
         .select('stripe_account_id, total_amount')
         .eq('payment_intent_id', paymentIntent.id)
@@ -371,7 +371,7 @@ export class PaymentsService {
   async processRefund(bookingId: string, amount?: number): Promise<void> {
     try {
       // Get booking details
-      const { data: booking, error: bookingError } = await this.supabase
+      const { data: booking, error: bookingError } = await this.getSupabase()
         .from('bookings')
         .select('payment_intent_id, total_amount, status')
         .eq('id', bookingId)
@@ -394,7 +394,7 @@ export class PaymentsService {
       });
 
       // Update booking status
-      const { error: updateError } = await this.supabase
+      const { error: updateError } = await this.getSupabase()
         .from('bookings')
         .update({ status: 'cancelled' })
         .eq('id', bookingId);
@@ -412,7 +412,7 @@ export class PaymentsService {
    */
   async getBooking(bookingId: string): Promise<Booking | null> {
     try {
-      const { data: booking, error } = await this.supabase
+      const { data: booking, error } = await this.getSupabase()
         .from('bookings')
         .select('*')
         .eq('id', bookingId)
@@ -471,7 +471,7 @@ export class PaymentsService {
    */
   private async updateAccountStatus(account: Stripe.Account): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.getSupabase()
         .from('stripe_accounts')
         .update({
           status: account.charges_enabled ? 'active' : 'pending',

@@ -81,7 +81,7 @@ export class CommuteIntelligenceService {
   private async loadUniversities() {
     try {
       // Load universities from database
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getSupabase()
         .from('universities')
         .select('*');
 
@@ -294,7 +294,7 @@ export class CommuteIntelligenceService {
       console.log('Starting commute cache population...');
 
       // Get all apartments
-      const { data: apartments, error: aptError } = await this.supabase
+      const { data: apartments, error: aptError } = await this.getSupabase()
         .from('apartments')
         .select('id, latitude, longitude')
         .not('latitude', 'is', null)
@@ -351,7 +351,7 @@ export class CommuteIntelligenceService {
       for (let i = 0; i < cacheEntries.length; i += batchSize) {
         const batch = cacheEntries.slice(i, i + batchSize);
 
-        const { error: insertError } = await this.supabase
+        const { error: insertError } = await this.getSupabase()
           .from('commute_cache')
           .upsert(batch, {
             onConflict: 'apartment_id,university_id,mode',
@@ -379,7 +379,7 @@ export class CommuteIntelligenceService {
     mode: string = 'transit'
   ): Promise<CommuteResult | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getSupabase()
         .from('commute_cache')
         .select('*')
         .eq('apartment_id', apartmentId)
@@ -417,7 +417,7 @@ export class CommuteIntelligenceService {
    */
   async updateApartmentCommuteCache(apartmentId: string): Promise<void> {
     try {
-      const { data: apartment, error } = await this.supabase
+      const { data: apartment, error } = await this.getSupabase()
         .from('apartments')
         .select('latitude, longitude')
         .eq('id', apartmentId)
@@ -456,7 +456,7 @@ export class CommuteIntelligenceService {
       }
 
       // Upsert cache entries
-      const { error: upsertError } = await this.supabase
+      const { error: upsertError } = await this.getSupabase()
         .from('commute_cache')
         .upsert(cacheEntries, {
           onConflict: 'apartment_id,university_id,mode',
