@@ -5,7 +5,10 @@ function getSupabase() {
   return getSupabaseClient();
 }
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+function getStripe() {
+  const stripe = require('stripe');
+  return stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 interface PaymentIntentRequest {
   bookingId: string;
@@ -21,6 +24,7 @@ interface PaymentIntentRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
     const supabase = getSupabase();
     const body = (await request.json()) as PaymentIntentRequest;
     const {
@@ -94,6 +98,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const stripe = getStripe();
     const supabase = getSupabase();
     const { id } = params;
 
