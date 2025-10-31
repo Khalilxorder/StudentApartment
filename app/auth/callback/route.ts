@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getFriendlyOAuthError } from '@/lib/auth-errors';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -13,15 +14,32 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error('OAuth error:', error, error_description);
     const redirectUrl = new URL('/login', requestUrl.origin);
-    redirectUrl.searchParams.set('error', error_description || 'Authentication failed');
+    const friendlyError = getFriendlyOAuthError(
+      error_description || error,
+      'Google'
+    );
+    redirectUrl.searchParams.set('error', friendlyError);
     return NextResponse.redirect(redirectUrl);
   }
 
   if (code) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Supabase environment variables are not configured for OAuth callback');
+      const redirectUrl = new URL('/login', requestUrl.origin);
+      redirectUrl.searchParams.set(
+        'error',
+        'Authentication is not configured. Please contact support.'
+      );
+      return NextResponse.redirect(redirectUrl);
+    }
+
     const cookieStore = await cookies();
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
@@ -45,46 +63,71 @@ export async function GET(request: NextRequest) {
     // Log the code for debugging
     console.log('Received OAuth code:', code.substring(0, 20) + '...');
 
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    let sessionData:
+      | Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>['data']
+      | null = null;
+    let exchangeError:
+      | Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>['error']
+      | Error
+      | null = null;
+
+    try {
+      const result = await supabase.auth.exchangeCodeForSession(code);
+      sessionData = result.data;
+      exchangeError = result.error;
+    } catch (err) {
+      exchangeError = err as Error;
+    }
 
     if (exchangeError) {
       console.error('Session exchange error:', exchangeError);
-      console.error('Error details:', {
-        message: exchangeError.message,
-        status: exchangeError.status,
-        code: exchangeError.code
-      });
+      if (exchangeError && typeof (exchangeError as any)?.message === 'string') {
+        console.error('Error details:', {
+          message: (exchangeError as any).message,
+          status: (exchangeError as any).status,
+          code: (exchangeError as any).code,
+        });
+      }
 
       const redirectUrl = new URL('/login', requestUrl.origin);
-      redirectUrl.searchParams.set('error', 'Failed to complete sign in');
+      redirectUrl.searchParams.set(
+        'error',
+        getFriendlyOAuthError(exchangeError, 'Google')
+      );
       return NextResponse.redirect(redirectUrl);
     }
 
-    console.log('Session exchange successful:', !!data.session);
+    console.log('Session exchange successful:', !!sessionData?.session);
 
     // Check if user profile exists, create if not
-    if (data.user) {
+    if (sessionData?.user) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, preferences')
-        .eq('id', data.user.id)
+        .eq('id', sessionData.user.id)
         .single();
 
       if (!profile && profileError?.code === 'PGRST116') {
         // Profile doesn't exist, create it
-        const fullName = data.user.user_metadata?.full_name || data.user.user_metadata?.name || '';
+        const fullName =
+          sessionData.user.user_metadata?.full_name ||
+          sessionData.user.user_metadata?.name ||
+          '';
         
         await supabase.from('profiles').insert({
-          id: data.user.id,
-          email: data.user.email,
+          id: sessionData.user.id,
+          email: sessionData.user.email,
           full_name: fullName,
-          avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null,
+          avatar_url:
+            sessionData.user.user_metadata?.avatar_url ||
+            sessionData.user.user_metadata?.picture ||
+            null,
           role: 'user',
           verified: false,
           preferences: {}
         });
 
-        console.log('Created new profile for user:', data.user.id);
+        console.log('Created new profile for user:', sessionData.user.id);
       }
 
       // Check if user has completed onboarding (stored in preferences)

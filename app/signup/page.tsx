@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/utils/supabaseClient';
 import Link from 'next/link';
+import { getFriendlyOAuthError } from '@/lib/auth-errors';
+import { supabase } from '@/utils/supabaseClient';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -71,18 +72,33 @@ export default function SignUpPage() {
     setSuccess(null);
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        console.error('Google sign-up failed', error);
+        setError(getFriendlyOAuthError(error, 'Google'));
+        setLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setError('Unable to start Google sign-up. Please try again later.');
+      setLoading(false);
+    } catch (err) {
+      console.error('Google sign-up failed', err);
+      setError(getFriendlyOAuthError(err, 'Google'));
       setLoading(false);
     }
-    // OAuth will redirect, so no need to set loading to false
   };
 
   return (

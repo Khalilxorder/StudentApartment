@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/utils/supabaseClient';
 import Link from 'next/link';
+import { getFriendlyOAuthError } from '@/lib/auth-errors';
+import { supabase } from '@/utils/supabaseClient';
 
 function LoginForm() {
   const router = useRouter();
@@ -46,18 +47,33 @@ function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        console.error('Google sign-in failed', error);
+        setError(getFriendlyOAuthError(error, 'Google'));
+        setLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setError('Unable to start Google sign-in. Please try again later.');
+      setLoading(false);
+    } catch (err) {
+      console.error('Google sign-in failed', err);
+      setError(getFriendlyOAuthError(err, 'Google'));
       setLoading(false);
     }
-    // OAuth will redirect, so no need to set loading to false
   };
 
   return (
