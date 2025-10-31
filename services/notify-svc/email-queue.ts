@@ -15,74 +15,94 @@ export interface EmailJobData {
 }
 
 export class EmailQueueService {
-  private queue: Queue;
-  private worker: Worker;
-  private resend: Resend | null;
+  private queue: Queue | null = null;
+  private worker: Worker | null = null;
+  private resend: Resend | null = null;
+  private initialized = false;
 
   constructor() {
-    // Initialize Redis connection
-    const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
-    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    // Lazy initialization - don't connect to Redis in constructor
+    // This prevents build-time failures when Redis is unavailable
+  }
 
-    let connection;
-    if (redisUrl && redisToken) {
-      // Upstash Redis
-      connection = {
-        host: redisUrl.replace('https://', '').replace('http://', '').split('.')[0],
-        password: redisToken,
-        port: 6379,
-        tls: {},
-      };
-    } else if (redisUrl) {
-      // Standard Redis
-      const redis = new IORedis(redisUrl);
-      connection = redis;
-    } else {
-      // Fallback to local Redis
-      connection = {
-        host: 'localhost',
-        port: 6379,
-      };
-    }
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    
+    try {
+      // Initialize Redis connection only when needed
+      const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
+      const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-    // Initialize queue
-    this.queue = new Queue('email-queue', {
-      connection,
-      defaultJobOptions: {
-        removeOnComplete: 50,
-        removeOnFail: 100,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
+      let connection;
+      if (redisUrl && redisToken) {
+        // Upstash Redis
+        connection = {
+          host: redisUrl.replace('https://', '').replace('http://', '').split('.')[0],
+          password: redisToken,
+          port: 6379,
+          tls: {},
+        };
+      } else if (redisUrl) {
+        // Standard Redis
+        const redis = new IORedis(redisUrl);
+        connection = redis;
+      } else {
+        // Local Redis or skip if not configured
+        connection = {
+          host: 'localhost',
+          port: 6379,
+        };
+      }
+
+      // Initialize queue
+      this.queue = new Queue('email-queue', {
+        connection,
+        defaultJobOptions: {
+          removeOnComplete: 50,
+          removeOnFail: 100,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
         },
-      },
-    });
+      });
 
-    // Initialize Resend
-    this.resend = process.env.RESEND_API_KEY
-      ? new Resend(process.env.RESEND_API_KEY)
-      : null;
+      // Initialize Resend
+      this.resend = process.env.RESEND_API_KEY
+        ? new Resend(process.env.RESEND_API_KEY)
+        : null;
 
-    // Initialize worker
-    this.worker = new Worker('email-queue', this.processEmailJob.bind(this), {
-      connection,
-      concurrency: 5, // Process up to 5 emails simultaneously
-    });
+      // Initialize worker
+      this.worker = new Worker('email-queue', this.processEmailJob.bind(this), {
+        connection,
+        concurrency: 5, // Process up to 5 emails simultaneously
+      });
 
-    // Worker event handlers
-    this.worker.on('completed', (job) => {
-      console.log(`✅ Email job ${job.id} completed`);
-    });
+      // Worker event handlers
+      this.worker.on('completed', (job) => {
+        console.log(`✅ Email job ${job.id} completed`);
+      });
 
-    this.worker.on('failed', (job, err) => {
-      console.error(`❌ Email job ${job?.id} failed:`, err);
-    });
+      this.worker.on('failed', (job, err) => {
+        console.error(`❌ Email job ${job?.id} failed:`, err);
+      });
 
-    console.log('📧 Email queue service initialized');
+      this.initialized = true;
+      console.log('📧 Email queue service initialized');
+    } catch (error) {
+      console.warn('⚠️ Email queue service initialization failed:', error);
+      // Don't throw - allow the app to continue without queue service
+    }
   }
 
   async addEmailJob(data: EmailJobData, options?: { delay?: number; priority?: number }) {
+    await this.ensureInitialized();
+    
+    if (!this.queue) {
+      throw new Error('Email queue service not initialized - Redis unavailable');
+    }
+
     const jobData = {
       ...data,
       retryCount: data.retryCount || 0,
@@ -99,6 +119,12 @@ export class EmailQueueService {
   }
 
   async addBulkEmails(emails: EmailJobData[], batchSize: number = 10) {
+    await this.ensureInitialized();
+    
+    if (!this.queue) {
+      throw new Error('Email queue service not initialized - Redis unavailable');
+    }
+
     const jobs = [];
 
     for (let i = 0; i < emails.length; i += batchSize) {
@@ -158,6 +184,17 @@ export class EmailQueueService {
   }
 
   async getQueueStats() {
+    await this.ensureInitialized();
+    
+    if (!this.queue) {
+      return {
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+      };
+    }
+
     const waiting = await this.queue.getWaiting();
     const active = await this.queue.getActive();
     const completed = await this.queue.getCompleted();
@@ -172,8 +209,12 @@ export class EmailQueueService {
   }
 
   async close() {
-    await this.worker.close();
-    await this.queue.close();
+    if (this.worker) {
+      await this.worker.close();
+    }
+    if (this.queue) {
+      await this.queue.close();
+    }
     console.log('📧 Email queue service closed');
   }
 
