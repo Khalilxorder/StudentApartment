@@ -1,6 +1,8 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+export const revalidate = 0;
 
 import { useState, useEffect, useRef, useCallback, FormEvent, MouseEvent } from 'react';
 import Link from 'next/link';
