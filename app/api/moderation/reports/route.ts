@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase-build-safe';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  return getSupabaseClient();
+}
 
 interface ContentReportRequest {
   reporterId: string;
@@ -20,6 +19,7 @@ interface ContentReportRequest {
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') || 'pending';
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = (await request.json()) as ContentReportRequest;
     const { reporterId, targetType, targetId, reason, details } = body;
 
