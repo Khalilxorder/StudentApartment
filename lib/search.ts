@@ -5,14 +5,17 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Helper function to get Supabase client (allows dependency injection for testing)
-function getSupabaseClient(client?: SupabaseClient) {
-  return client || supabase;
+// Lazy-load Supabase client - allows dependency injection for testing
+function getSupabaseClientInstance(client?: SupabaseClient) {
+  if (client) return client;
+  
+  // Lazy initialize only when called (not at module load time)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Missing Supabase credentials');
+  }
+  return createClient(url, key);
 }
 
 export interface Location {
@@ -384,7 +387,7 @@ export function filterApartments(apartments: Apartment[], filters: SearchFilters
  */
 export async function searchApartments(filters: SearchFilters, userPreferences?: any, supabaseClient?: SupabaseClient): Promise<RankedApartment[]> {
   try {
-    const client = getSupabaseClient(supabaseClient);
+    const client = getSupabaseClientInstance(supabaseClient);
     const query = buildSearchQuery(client, filters);
     const { data: apartments, error } = await query.limit(100);
 

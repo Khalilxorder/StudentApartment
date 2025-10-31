@@ -6,14 +6,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { redirect } from 'next/navigation';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Helper function to get Supabase client (allows dependency injection for testing)
-function getSupabaseClient(client?: SupabaseClient) {
-  return client || supabase;
+// Lazy-load Supabase client - allows dependency injection for testing
+function getSupabaseClientInstance(client?: SupabaseClient) {
+  if (client) return client;
+  
+  // Lazy initialize only when called (not at module load time)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Missing Supabase credentials');
+  }
+  return createClient(url, key);
 }
 
 export interface AuthResult {
@@ -43,7 +46,7 @@ export async function signInWithEmail(email: string, password: string, client?: 
       return { success: false, error: 'Password must be at least 6 characters' };
     }
 
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
@@ -82,7 +85,7 @@ export async function signUpWithEmail(
       return { success: false, error: 'Password must be at least 6 characters' };
     }
 
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
@@ -114,7 +117,7 @@ export async function signUpWithEmail(
  */
 export async function signOut(client?: SupabaseClient): Promise<AuthResult> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { error } = await supabaseClient.auth.signOut();
 
     if (error) {
@@ -132,7 +135,7 @@ export async function signOut(client?: SupabaseClient): Promise<AuthResult> {
  */
 export async function getCurrentUser(client?: SupabaseClient): Promise<AuthResult> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.getUser();
 
     if (error) {
@@ -161,7 +164,7 @@ export async function resetPassword(email: string, client?: SupabaseClient): Pro
       return { success: false, error: 'Invalid email format' };
     }
 
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`,
     });
@@ -185,7 +188,7 @@ export async function updatePassword(newPassword: string, client?: SupabaseClien
       return { success: false, error: 'Password must be at least 6 characters' };
     }
 
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.updateUser({
       password: newPassword,
     });
@@ -208,7 +211,7 @@ export async function updatePassword(newPassword: string, client?: SupabaseClien
  */
 export async function verifyEmail(token: string, email: string, type: 'email' | 'recovery' = 'email', client?: SupabaseClient): Promise<AuthResult> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.verifyOtp({
       email,
       token,
@@ -234,7 +237,7 @@ export async function verifyEmail(token: string, email: string, type: 'email' | 
  */
 export async function refreshSession(client?: SupabaseClient): Promise<AuthResult> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data, error } = await supabaseClient.auth.refreshSession();
 
     if (error) {
@@ -255,7 +258,7 @@ export async function refreshSession(client?: SupabaseClient): Promise<AuthResul
  */
 export async function isAuthenticated(client?: SupabaseClient): Promise<boolean> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data } = await supabaseClient.auth.getSession();
     return !!data.session;
   } catch {
@@ -268,7 +271,7 @@ export async function isAuthenticated(client?: SupabaseClient): Promise<boolean>
  */
 export async function requireAuth(client?: SupabaseClient): Promise<AuthCheckResult> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data } = await supabaseClient.auth.getSession();
 
     if (data.session) {
@@ -286,7 +289,7 @@ export async function requireAuth(client?: SupabaseClient): Promise<AuthCheckRes
  */
 export async function getUserRole(client?: SupabaseClient): Promise<string | null> {
   try {
-    const supabaseClient = getSupabaseClient(client);
+    const supabaseClient = getSupabaseClientInstance(client);
     const { data } = await supabaseClient.auth.getUser();
     return data.user?.user_metadata?.role || null;
   } catch {
@@ -314,7 +317,7 @@ export function hasPermission(userRole: string | null, action: string): boolean 
 export async function withAuth(handler: Function, requiredRole?: string, client?: SupabaseClient) {
   return async (req: Request, context?: any) => {
     try {
-      const supabaseClient = getSupabaseClient(client);
+      const supabaseClient = getSupabaseClientInstance(client);
       const { data } = await supabaseClient.auth.getSession();
 
       if (!data.session) {
