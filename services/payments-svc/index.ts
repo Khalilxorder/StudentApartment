@@ -36,18 +36,30 @@ export interface Booking {
 }
 
 export class PaymentsService {
-  private stripe: Stripe;
-  private supabase: any;
+  private stripe: Stripe | null = null;
+  private supabase: any = null;
+
+  private getStripe(): Stripe {
+    if (!this.stripe) {
+      this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2025-09-30.clover',
+      });
+    }
+    return this.stripe;
+  }
+
+  private getSupabase(): any {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this.supabase;
+  }
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: '2025-09-30.clover',
-    });
-
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialize - don't access process.env here
   }
 
   /**
@@ -59,7 +71,7 @@ export class PaymentsService {
     metadata: Record<string, any> = {}
   ): Promise<PaymentIntent> {
     try {
-      const paymentIntent = await this.stripe.paymentIntents.create({
+      const paymentIntent = await this.getStripe().paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to smallest currency unit
         currency,
         automatic_payment_methods: {
@@ -212,7 +224,7 @@ export class PaymentsService {
       }
 
       // Create new Stripe Connect account
-      const account = await this.stripe.accounts.create({
+      const account = await this.getStripe().accounts.create({
         type: 'express',
         country: 'HU',
         email: await this.getUserEmail(userId),
@@ -266,7 +278,7 @@ export class PaymentsService {
    */
   async createAccountLink(accountId: string): Promise<string> {
     try {
-      const accountLink = await this.stripe.accountLinks.create({
+      const accountLink = await this.getStripe().accountLinks.create({
         account: accountId,
         refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/payments/onboarding?failed=true`,
         return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/payments/onboarding?success=true`,
@@ -287,7 +299,7 @@ export class PaymentsService {
   async confirmPayment(paymentIntentId: string): Promise<void> {
     try {
       // Get payment intent from Stripe
-      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await this.getStripe().paymentIntents.retrieve(paymentIntentId);
 
       if (paymentIntent.status === 'succeeded') {
         // Update booking status
@@ -338,7 +350,7 @@ export class PaymentsService {
       const hostAmount = Math.round(booking.total_amount * 100) - platformFee;
 
       // Create transfer
-      await this.stripe.transfers.create({
+      await this.getStripe().transfers.create({
         amount: hostAmount,
         currency: 'huf',
         destination: booking.stripe_account_id,
@@ -376,7 +388,7 @@ export class PaymentsService {
       // Create refund
       const refundAmount = amount ? Math.round(amount * 100) : undefined;
 
-      await this.stripe.refunds.create({
+      await this.getStripe().refunds.create({
         payment_intent: booking.payment_intent_id,
         amount: refundAmount,
       });
