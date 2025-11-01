@@ -25,6 +25,18 @@ const getAnonKey = () => {
 let browserClient: SupabaseClient | null = null;
 
 const getBrowserClient = (): SupabaseClient => {
+  // Safety check: don't create browser client during SSR/build
+  if (typeof window === 'undefined') {
+    // Return a mock client for SSR that will be replaced on hydration
+    return {
+      from: () => ({ select: () => Promise.resolve({ data: [], error: null }) }),
+      auth: {
+        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+        signOut: () => Promise.resolve({ error: null }),
+      },
+    } as any as SupabaseClient;
+  }
+  
   if (browserClient) {
     return browserClient;
   }
