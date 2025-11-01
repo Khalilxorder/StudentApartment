@@ -1,6 +1,15 @@
 // Using REST API directly to avoid SDK compatibility issues
-const API_KEY = process.env.GOOGLE_AI_API_KEY || '';
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+// Get API key lazily to ensure env vars are loaded
+function getApiKey(): string {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key) {
+    console.error('❌ GOOGLE_AI_API_KEY environment variable is not set!');
+    console.log('📍 Current env vars:', Object.keys(process.env).filter(k => k.includes('GOOGLE')));
+  }
+  return key || '';
+}
 
 // Simple in-memory cache for AI scoring results
 const scoringCache = new Map<string, { result: any; timestamp: number }>();
@@ -53,7 +62,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     // Try all models in parallel for fastest response (race condition)
     const parallelAttempts = modelsToTry.slice(0, 2).map(async (modelName) => {
       try {
-        const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
+        const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
         
         console.log(`🤖 Server: Analyzing story with ${modelName}...`);
         const response = await fetch(url, {
@@ -103,7 +112,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
       // Sequential fallback with remaining models
       for (const modelName of modelsToTry.slice(2)) {
         try {
-          const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
+          const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
           
           const response = await fetch(url, {
             method: 'POST',
