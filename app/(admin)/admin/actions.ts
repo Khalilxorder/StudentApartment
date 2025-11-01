@@ -17,6 +17,7 @@ type ParsedApartmentForm = {
   balcony: number;
   isAvailable: boolean;
   imageUrls: string[];
+  featureIds: string[];
   uploadedImageKeys: string[];
   deletedImageKeys: string[];
 };
@@ -134,9 +135,11 @@ const parseApartmentForm = (
   const isAvailable = parseBoolean(formData.get('is_available'));
 
   const imageUrls = collectFormValues(formData, 'image_urls');
-  if (requireImages && imageUrls.length === 0) {
-    throw new Error('Please upload at least one image before submitting.');
+  if (requireImages && imageUrls.length < 3) {
+    throw new Error('Please upload at least 3 quality photos before submitting.');
   }
+  
+  const featureIds = collectFormValues(formData, 'feature_ids');
 
   const uploadedImageKeys = collectFormValues(formData, 'uploaded_image_keys');
   const deletedImageKeys = collectFormValues(formData, 'deleted_image_keys');
@@ -155,6 +158,7 @@ const parseApartmentForm = (
     balcony,
     isAvailable,
     imageUrls,
+    featureIds,
     uploadedImageKeys,
     deletedImageKeys,
   };
@@ -211,6 +215,7 @@ export async function addApartment(formData: FormData) {
     status,
     published_at: parsed.isAvailable ? now : null,
     image_urls: parsed.imageUrls,
+    feature_ids: parsed.featureIds.length > 0 ? parsed.featureIds : null,
   };
 
   const { data, error } = await supabase
@@ -265,6 +270,7 @@ export async function updateApartment(id: string, formData: FormData) {
     status,
     published_at: parsed.isAvailable ? now : null,
     image_urls: parsed.imageUrls,
+    feature_ids: parsed.featureIds.length > 0 ? parsed.featureIds : null,
     updated_at: now,
   };
 

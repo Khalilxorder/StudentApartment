@@ -172,8 +172,25 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
         formData.set('garden', roomCounts.Garden.toString());
         formData.set('living_room', roomCounts['Living Room'].toString());
         formData.set('storage', roomCounts.Storage.toString());
-        formData.set('features', JSON.stringify(features));
-        formData.set('image_urls', JSON.stringify(imageUrls));
+        
+        // Clear existing image_urls and feature_ids entries before adding new ones
+        // Use getAll to check for existing entries, then remove them
+        formData.getAll('image_urls').forEach(() => {
+          formData.delete('image_urls');
+        });
+        formData.getAll('feature_ids').forEach(() => {
+          formData.delete('feature_ids');
+        });
+        
+        // Append image URLs as individual form entries (for collectFormValues to process)
+        imageUrls.forEach(url => {
+          formData.append('image_urls', url);
+        });
+        
+        // Append feature IDs as individual form entries
+        features.forEach(featureId => {
+          formData.append('feature_ids', featureId);
+        });
 
         if (coordinates) {
           formData.set('latitude', coordinates.lat.toString());
