@@ -67,5 +67,22 @@ export function createServiceRoleClient(): SupabaseClient {
 
 export const createServiceClient = createServiceRoleClient;
 
-export const supabase: SupabaseClient =
-  typeof window === 'undefined' ? (null as unknown as SupabaseClient) : getBrowserClient();
+// Lazy getter for default supabase client - don't create at module level
+let _cachedSupabase: SupabaseClient | null = null;
+export function getSupabase(): SupabaseClient {
+  if (typeof window === 'undefined') {
+    throw new Error('getSupabase() can only be called in browser context');
+  }
+  if (!_cachedSupabase) {
+    _cachedSupabase = getBrowserClient();
+  }
+  return _cachedSupabase;
+}
+
+// Legacy export - use getSupabase() instead
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    // Lazy initialization on first property access
+    return getSupabase()[prop as keyof SupabaseClient];
+  }
+});
