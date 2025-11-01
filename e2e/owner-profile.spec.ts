@@ -1,7 +1,7 @@
 // FILE: e2e/owner-profile.spec.ts
 // End-to-end tests for owner profile management
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Owner Profile Management', () => {
   const baseUrl = process.env.E2E_BASE_URL || 'http://localhost:3000';
@@ -9,7 +9,7 @@ test.describe('Owner Profile Management', () => {
   const testPassword = 'TestPassword123!';
 
   // Helper to signup and login
-  async function signupAndLogin(page) {
+  async function signupAndLogin(page: Page) {
     // Navigate to signup
     await page.goto(`${baseUrl}/signup`);
     await page.waitForLoadState('networkidle');
@@ -95,7 +95,7 @@ test.describe('Owner Profile Management', () => {
     // Fill business info
     await page.fill('input[id="company_name"]', 'Budapest Properties Ltd.');
     await page.fill('input[id="license_number"]', 'BPL-12345');
-    await page.select('select[id="years_experience"]', '10+');
+  await page.locator('select[id="years_experience"]').selectOption('10+');
     await page.fill('input[id="website"]', 'https://budapestroperties.com');
 
     // Save
@@ -108,7 +108,8 @@ test.describe('Owner Profile Management', () => {
 
     expect(await page.inputValue('input[id="company_name"]')).toBe('Budapest Properties Ltd.');
     expect(await page.inputValue('input[id="license_number"]')).toBe('BPL-12345');
-    expect(await page.selectOption('select[id="years_experience"]')).toContain('10+');
+  const yearsExperienceValue = await page.locator('select[id="years_experience"]').inputValue();
+  expect(yearsExperienceValue).toBe('10+');
     expect(await page.inputValue('input[id="website"]')).toBe('https://budapestroperties.com');
   });
 
@@ -202,8 +203,8 @@ test.describe('Owner Profile Management', () => {
     await page.goto(`${baseUrl}/owner/profile`);
     await page.waitForLoadState('networkidle');
 
-    const selected = await page.selectOption('select[id="preferred_contact"]');
-    expect(selected).toContain('phone');
+  const selectedContact = await page.locator('select[id="preferred_contact"]').inputValue();
+  expect(selectedContact).toBe('phone');
   });
 
   test('should show profile completeness progress for excellent profile', async ({ page }) => {
@@ -217,7 +218,7 @@ test.describe('Owner Profile Management', () => {
     await page.fill('textarea[id="bio"]', 'Experienced property manager');
     await page.fill('input[id="company_name"]', 'Complete Properties');
     await page.fill('input[id="website"]', 'https://complete.com');
-    await page.select('select[id="years_experience"]', '10+');
+  await page.locator('select[id="years_experience"]').selectOption('10+');
     await page.fill('input[id="facebook"]', 'https://facebook.com/complete');
     
     // Check Student Housing

@@ -58,12 +58,13 @@ function hashUserProfile(userProfile: any): string {
   return Buffer.from(key).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
 }
 
-// Models available - Using only the LATEST and FASTEST Flash models
+// Models available - FIXED: Using gemini-2.5-flash-lite-preview
+// Note: This is the current working model for the project
 export const MODELS = {
-  TEXT: 'gemini-2.5-flash', // Primary: Latest Flash 2.5 for speed and quality
-  FLASH: 'gemini-2.5-flash', // Latest Flash model
-  FLASH_PREVIEW: 'gemini-2.0-flash-exp', // Preview version with latest features
-  PRO: 'gemini-2.5-pro' // Pro as backup for complex queries
+  TEXT: 'gemini-2.5-flash-lite-preview', // Current working model
+  FLASH: 'gemini-2.5-flash-lite-preview', // Current working model
+  FLASH_PREVIEW: 'gemini-2.5-flash-lite-preview', // Current working model
+  PRO: 'gemini-2.5-flash-lite-preview' // Current working model
 } as const;
 
 // Generate response from text prompt using REST API with parallel failover + circuit breaker
@@ -79,12 +80,9 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     return pendingRequests.get(requestHash)!;
   }
   
-  // Try different models in order of preference (prioritize latest Flash for speed)
+  // FIXED: Use gemini-2.5-flash-lite-preview model
   const modelsToTry = [
-    'gemini-2.5-flash',        // Latest and fastest Flash 2.5
-    'gemini-2.0-flash-exp',    // Experimental 2.0 Flash
-    'gemini-2.0-flash',        // Stable 2.0 Flash as fallback
-    'gemini-1.5-flash',        // 1.5 Flash as last resort
+    'gemini-2.5-flash-lite-preview',    // Current working model
   ];
 
   const makeRequest = async (): Promise<string> => {

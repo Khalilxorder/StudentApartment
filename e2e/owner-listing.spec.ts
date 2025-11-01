@@ -149,8 +149,8 @@ test.describe('Owner Listing Form - E2E Tests', () => {
       await expect(mapContainer).toBeVisible();
 
       // Verify that hidden latitude/longitude inputs exist
-      const latInput = page.locator('input[name="latitude"]', { exact: false });
-      const lngInput = page.locator('input[name="longitude"]', { exact: false });
+  const latInput = page.locator('input[name="latitude"]');
+  const lngInput = page.locator('input[name="longitude"]');
       // These may be hidden fields
     }
   });

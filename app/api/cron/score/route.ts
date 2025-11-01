@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const activeUserIds = activeUsersResult.rows.map((r) => r.user_id);
+  const activeUserIds = activeUsersResult.rows.map(({ user_id }: { user_id: string }) => user_id);
     console.log('[ScoringCron] Found', activeUserIds.length, 'active users');
 
     // Process each user

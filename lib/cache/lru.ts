@@ -32,8 +32,10 @@ export class LRUCache<K, V> {
 
     // Evict least recently used if over capacity
     if (this.cache.size > this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      const iterator = this.cache.keys().next();
+      if (!iterator.done) {
+        this.cache.delete(iterator.value);
+      }
     }
   }
 

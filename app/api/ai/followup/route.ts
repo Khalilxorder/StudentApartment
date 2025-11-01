@@ -37,8 +37,13 @@ export async function POST(request: NextRequest) {
 
   try {
     // Parse JSON once, reuse for retries
-    parsedBody = await request.json();
-    
+    const rawBody = await request.json();
+    parsedBody = rawBody && typeof rawBody === 'object' ? (rawBody as FollowUpRequest) : null;
+
+    if (!parsedBody) {
+      throw new FollowUpError('INVALID_INPUT', 'Request body must be a JSON object');
+    }
+
     const { story, preferences, askedQuestions } = parsedBody;
 
     if (!story || typeof story !== 'string') {
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
       console.log('[FollowUp] 🔄 Retrying after transient error...');
       try {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
-        const { story, preferences, askedQuestions } = parsedBody;
+  const { story, preferences, askedQuestions } = parsedBody;
         const questions = await generateFollowUpQuestions(story, preferences, askedQuestions);
         
         return NextResponse.json({

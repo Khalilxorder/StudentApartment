@@ -102,7 +102,7 @@ export class AIDocumentVerificationService {
       // Download document content (assuming it's an image)
       const documentContent = await this.downloadDocument(documentUrl);
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite-preview' });
 
       const prompt = this.buildAnalysisPrompt(documentType, userContext);
 
@@ -660,7 +660,7 @@ export class VerificationService {
       // Download document content (assuming it's an image)
       const documentContent = await this.downloadDocument(documentUrl);
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite-preview' });
 
       const prompt = this.buildAnalysisPrompt(documentType, userContext);
 

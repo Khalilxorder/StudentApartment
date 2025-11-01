@@ -89,7 +89,7 @@ DROP TRIGGER IF EXISTS update_apartment_embeddings_timestamp ON public.apartment
 CREATE TRIGGER update_apartment_embeddings_timestamp
   BEFORE UPDATE ON public.apartment_embeddings
   FOR EACH ROW
-  EXECUTE FUNCTION public.update_timestamp_column();
+  EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Step 8: Add comment documenting the schema
 COMMENT ON TABLE public.apartment_embeddings IS 'Apartment semantic embeddings using text-embedding-004 (768 dimensions)';

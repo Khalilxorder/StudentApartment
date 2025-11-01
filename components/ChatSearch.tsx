@@ -3,21 +3,19 @@
 import { useEffect, useState, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabaseClient';
-import { useTranslations } from '@/lib/i18n';
 import {
   matchFeaturesFromStory,
   calculateFeatureMatchScore,
   FeatureIcon
 } from '@/utils/feature-icons';
 import { sanitizeUserInput } from '@/lib/sanitize';
-import {
-  generateIntelligentMatchExplanation,
-  ArchetypeProfile,
-  Archetype,
-  ARCHETYPE_BIG_FIVE_CORRELATIONS
-} from '@/utils/archetypal-matching';
-import ApartmentExplanationModal from './ApartmentExplanationModal';
 import ExplainWhy, { RecommendationReason } from './ExplainWhy';
+import SearchOriginBadge, {
+  determineSearchOrigin,
+  getScoreForDisplay,
+  type SearchOrigin
+} from './SearchOriginBadge';
+import WhyThisModal from './WhyThisModal';
 
 type Message = {
   id: string;
@@ -26,6 +24,20 @@ type Message = {
 };
 
 const EXPLAIN_WEIGHTS = [0.85, 0.7, 0.55];
+
+type WhyModalState = {
+  apartmentId: string;
+  apartmentTitle: string;
+  score: number;
+  origin: SearchOrigin;
+  reasons: { factor: string; description: string; weight?: number }[];
+  aiReasons: string[];
+  scoreComponents: {
+    aiScore?: number | null;
+    featureMatchScore?: number | null;
+    semanticScore?: number | null;
+  };
+};
 
 function buildExplainReasons(
   reasons: string[] | undefined,
@@ -74,12 +86,8 @@ export default function ChatSearch() {
   const [userId, setUserId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isOnline, setIsOnline] = useState(true);
-  const [userArchetypeProfile, setUserArchetypeProfile] = useState<ArchetypeProfile | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalExplanation, setModalExplanation] = useState('');
-  const [modalApartmentTitle, setModalApartmentTitle] = useState('');
-  const [modalMatchScore, setModalMatchScore] = useState(0);
-  const [modalReasons, setModalReasons] = useState<RecommendationReason[]>([]);
+  const [lastQuery, setLastQuery] = useState('');
+  const [whyModalState, setWhyModalState] = useState<WhyModalState | null>(null);
   const resultsPerPage = 12;
   const chatRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -223,56 +231,73 @@ export default function ChatSearch() {
     apartment: any,
     context?: { matchedFeatures?: FeatureIcon[]; matchScore?: number; aiReasons?: RecommendationReason[] }
   ) => {
-    // Create a default archetype profile if none exists
-    const defaultProfile: ArchetypeProfile = {
-      primaryArchetype: Archetype.MAGICIAN,
-      bigFiveScores: {
-        openness: 75,
-        conscientiousness: 70,
-        extraversion: 65,
-        agreeableness: 70,
-        neuroticism: 40
-      },
-      symbolicResonances: ['freedom', 'creativity', 'mystery'],
-      spiritualConnections: []
-    };
+    if (!apartment) return;
 
-    const profile = userArchetypeProfile || defaultProfile;
     const matchedFeatures = context?.matchedFeatures || apartment.matchedFeatures || [];
-    const apartmentForExplanation = matchedFeatures.length
-      ? { ...apartment, matchedFeatures }
-      : apartment;
     const explanationReasons =
       context?.aiReasons && context.aiReasons.length > 0
         ? context.aiReasons
         : buildExplainReasons(apartment.aiReasons, matchedFeatures);
-    let explanation = generateIntelligentMatchExplanation(
-      profile,
-      apartmentForExplanation,
-      matchedFeatures
-    );
 
-    if (explanationReasons.length > 0) {
-      const reasonsList = explanationReasons
-        .map((reason) => `- ${reason.factor}: ${reason.description}`)
-        .join('\n');
-      explanation += `\n\n**Top reasons**\n${reasonsList}`;
+    const mergedResult = {
+      ...apartment,
+      aiScore: context?.matchScore ?? apartment.aiScore,
+    };
+
+    const origin = determineSearchOrigin(mergedResult);
+    const badgeScore = getScoreForDisplay(mergedResult) ?? context?.matchScore ?? apartment.featureMatchScore ?? apartment.score ?? 0;
+    const normalizedScore = Math.max(0, Math.min(100, Math.round(Number.isFinite(badgeScore) ? badgeScore : 0)));
+
+    setWhyModalState({
+      apartmentId: apartment.id,
+      apartmentTitle: apartment.title || apartment.address || 'Apartment',
+      score: normalizedScore,
+      origin,
+      reasons: explanationReasons.map((reason) => ({
+        factor: reason.factor,
+        description: reason.description,
+        weight: reason.weight,
+      })),
+      aiReasons: Array.isArray(apartment.aiReasons)
+        ? apartment.aiReasons.filter((reason: unknown): reason is string => typeof reason === 'string')
+        : [],
+      scoreComponents: {
+        aiScore: typeof apartment.aiScore === 'number' ? apartment.aiScore : null,
+        featureMatchScore: typeof apartment.featureMatchScore === 'number' ? apartment.featureMatchScore : null,
+        semanticScore: typeof apartment.score === 'number' ? apartment.score : null,
+      },
+    });
+  };
+
+  const submitSearchFeedback = async (helpful: boolean) => {
+    if (!whyModalState) return;
+
+    const payload = {
+      apartmentId: whyModalState.apartmentId,
+      helpful,
+      origin: whyModalState.origin,
+      score: whyModalState.score,
+      query: lastQuery || undefined,
+      components: {
+        origin: whyModalState.origin,
+        displayedScore: whyModalState.score,
+        aiScore: whyModalState.scoreComponents.aiScore,
+        featureMatchScore: whyModalState.scoreComponents.featureMatchScore,
+        semanticScore: whyModalState.scoreComponents.semanticScore,
+      },
+      reasons: whyModalState.reasons.map((reason) => reason.description).filter(Boolean).slice(0, 5),
+      aiReasons: whyModalState.aiReasons.slice(0, 5),
+    };
+
+    try {
+      await fetch('/api/search/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.warn('Failed to submit search feedback', error);
     }
-
-    // Extract match score (handle different property names)
-    const scoreSource =
-      context?.matchScore ??
-      apartment.aiScore ??
-      apartment.featureMatchScore ??
-      50;
-    const userScore = Math.round(scoreSource);
-
-    // Show in modal instead of chat
-    setModalExplanation(explanation);
-    setModalApartmentTitle(apartment.title || apartment.address || 'Apartment');
-    setModalMatchScore(userScore);
-    setModalReasons(explanationReasons);
-    setModalOpen(true);
   };
 
   const parseNaturalLanguage = (text: string) => {
@@ -661,6 +686,8 @@ export default function ChatSearch() {
     const trimmedInput = rawInput.trim();
     if (!trimmedInput || loading) return;
     const sanitizedQuery = sanitizeUserInput(trimmedInput);
+    setLastQuery(sanitizedQuery);
+    setWhyModalState(null);
     await runSearchFlow(sanitizedQuery);
     setQuery('');
   };
@@ -834,6 +861,8 @@ export default function ChatSearch() {
                   const userScoreRaw = apt.aiScore ?? apt.featureMatchScore ?? 50;
                   const userScore = Math.max(0, Math.min(100, Math.round(userScoreRaw)));
                   const scoreColor = userScore >= 80 ? 'bg-green-500' : userScore >= 60 ? 'bg-yellow-500' : 'bg-orange-500';
+                  const origin = determineSearchOrigin(apt);
+                  const badgeScore = getScoreForDisplay(apt) ?? userScore;
 
                   const explainReasons = buildExplainReasons(apt.aiReasons, matchedFeatures);
                   const compromiseList = Array.isArray(apt.aiCompromises) ? apt.aiCompromises.filter(Boolean).slice(0, 2) : [];
@@ -891,6 +920,19 @@ export default function ChatSearch() {
                           <span className="text-orange-600 font-bold text-lg whitespace-nowrap ml-2">
                             {priceLabel}
                           </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <SearchOriginBadge
+                            origin={origin}
+                            score={badgeScore}
+                            onClick={() => handleWhyThisClick(apt, {
+                              matchedFeatures,
+                              matchScore: userScore,
+                              aiReasons: explainReasons,
+                            })}
+                            className="mt-1"
+                          />
                         </div>
 
                         <div className="flex flex-wrap gap-3 text-sm text-gray-600">
@@ -1076,6 +1118,8 @@ export default function ChatSearch() {
                     setUserWishedFeatures([]);
                     setChatExpanded(false);
                     setCurrentPage(1);
+                    setWhyModalState(null);
+                    setLastQuery('');
                     localStorage.removeItem('chatSearch_results');
                     localStorage.removeItem('chatSearch_messages');
                     localStorage.removeItem('chatSearch_features');
@@ -1109,17 +1153,15 @@ export default function ChatSearch() {
         </>
       )}
 
-      {/* Modal for "Why this?" explanation */}
-      <ApartmentExplanationModal 
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setModalReasons([]);
-        }}
-        explanation={modalExplanation}
-        apartmentTitle={modalApartmentTitle}
-        matchScore={modalMatchScore}
-        reasons={modalReasons}
+      <WhyThisModal
+        isOpen={Boolean(whyModalState)}
+        onClose={() => setWhyModalState(null)}
+        apartmentTitle={whyModalState?.apartmentTitle ?? ''}
+        score={whyModalState?.score ?? 0}
+        origin={whyModalState?.origin ?? 'structured'}
+        reasons={whyModalState?.reasons ?? []}
+        aiReasons={whyModalState?.aiReasons ?? []}
+        onFeedback={(helpful) => submitSearchFeedback(helpful)}
       />
     </div>
   );

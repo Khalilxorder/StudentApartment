@@ -213,11 +213,48 @@ export class BatchScoringService {
     try {
       const result = await calculateSuitabilityScore(apartment, userProfile);
 
+      const normalizedReasons = Array.isArray(result.reasons)
+        ? result.reasons
+            .map((reason: any) => {
+              if (typeof reason === 'string') {
+                return reason;
+              }
+              if (reason && typeof reason === 'object' && typeof reason.description === 'string') {
+                return reason.description;
+              }
+              if (reason && typeof reason === 'object' && typeof reason.factor === 'string') {
+                return reason.factor;
+              }
+              if (reason != null) {
+                return String(reason);
+              }
+              return undefined;
+            })
+            .filter((value): value is string => Boolean(value))
+        : [];
+
+      const normalizedCompromises = Array.isArray(result.compromises)
+        ? result.compromises
+            .map((item: any) => {
+              if (typeof item === 'string') {
+                return item;
+              }
+              if (item && typeof item === 'object' && typeof item.description === 'string') {
+                return item.description;
+              }
+              if (item != null) {
+                return String(item);
+              }
+              return undefined;
+            })
+            .filter((value): value is string => Boolean(value))
+        : undefined;
+
       const scored: ScoredApartment = {
         apartmentId: apartment.id,
         aiScore: result.score || 50,
-        reasons: result.reasons || [],
-        compromises: result.compromises,
+        reasons: normalizedReasons,
+        compromises: normalizedCompromises,
         timestamp: new Date(),
         success: true,
       };

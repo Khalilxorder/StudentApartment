@@ -195,8 +195,8 @@ describe('Google Maps Configuration & Validation', () => {
     });
 
     it('should show loading state while map loads', () => {
-      const loadingComponent = () => <div>Loading Map...</div>;
-      expect(loadingComponent().props.children).toBe('Loading Map...');
+      const renderLoadingState = () => 'Loading Map...';
+      expect(renderLoadingState()).toBe('Loading Map...');
     });
   });
 
