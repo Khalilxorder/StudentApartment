@@ -1,6 +1,9 @@
 // Using REST API directly to avoid SDK compatibility issues
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+// Import circuit breaker for Gemini resilience
+import { getGeminiCircuitBreaker } from '../lib/circuit-breaker';
+
 // Get API key lazily to ensure env vars are loaded
 function getApiKey(): string {
   const key = process.env.GOOGLE_AI_API_KEY;
@@ -17,6 +20,32 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 
 // Request deduplication to prevent duplicate parallel requests
 const pendingRequests = new Map<string, Promise<any>>();
+
+// Timeout configurations
+const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
+const EMBEDDING_TIMEOUT_MS = 15000; // 15 seconds for embeddings
+
+/**
+ * Execute with timeout and circuit breaker protection
+ */
+async function executeWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<T> {
+  const breaker = getGeminiCircuitBreaker();
+  
+  return breaker.execute(async () => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`[AI_TIMEOUT] Operation timed out after ${timeoutMs}ms`)),
+          timeoutMs
+        )
+      ),
+    ]);
+  });
+}
 
 // Generate a simple hash for user profile to create cache keys
 function hashUserProfile(userProfile: any): string {
@@ -37,7 +66,7 @@ export const MODELS = {
   PRO: 'gemini-2.5-pro' // Pro as backup for complex queries
 } as const;
 
-// Generate response from text prompt using REST API with parallel failover
+// Generate response from text prompt using REST API with parallel failover + circuit breaker
 export async function generateTextResponse(prompt: string, context?: string): Promise<string> {
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
   
@@ -65,23 +94,26 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
         const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
         
         console.log(`🤖 Server: Analyzing story with ${modelName}...`);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: fullPrompt }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 8192,
-            }
-          })
-        });
+        const response = await executeWithTimeout(
+          fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: fullPrompt }]
+              }],
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            })
+          }),
+          DEFAULT_TIMEOUT_MS
+        );
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -114,23 +146,26 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
         try {
           const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
           
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: fullPrompt }]
-              }],
-              generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 8192,
-              }
-            })
-          });
+          const response = await executeWithTimeout(
+            fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{ text: fullPrompt }]
+                }],
+                generationConfig: {
+                  temperature: 0.7,
+                  topK: 40,
+                  topP: 0.95,
+                  maxOutputTokens: 8192,
+                }
+              })
+            }),
+            DEFAULT_TIMEOUT_MS
+          );
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -150,7 +185,12 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
             console.log(`✅ Success with fallback model: ${modelName}`);
             return text;
           }
-        } catch (error) {
+        } catch (error: any) {
+          const errorMsg = error?.message || String(error);
+          if (errorMsg.includes('[AI_TIMEOUT]') || errorMsg.includes('Circuit')) {
+            console.error(`❌ Timeout or circuit breaker triggered for ${modelName}`);
+            throw error; // Re-throw timeouts to avoid silent failures
+          }
           console.log(`⚠️ Error with ${modelName}:`, error);
           continue;
         }

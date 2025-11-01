@@ -103,31 +103,44 @@ const upsertEmbedding = async (apartmentId: string, vectorSql: string) => {
 };
 
 export const buildEmbeddings = async (batchSize = 50) => {
-  console.log('[embeddings] starting generation');
+  console.log('[embeddings] Starting 768-d embedding generation with text-embedding-004');
 
   try {
     const apartments = await fetchBatch(batchSize);
 
     if (apartments.length === 0) {
-      console.log('[embeddings] no apartments require updates');
+      console.log('[embeddings] No apartments require updates');
       return;
     }
 
-    console.log(`[embeddings] generating vectors for ${apartments.length} apartments`);
+    console.log(`[embeddings] Generating 768-d vectors for ${apartments.length} apartments`);
+    let successCount = 0;
+    let failureCount = 0;
 
     for (const apartment of apartments) {
-      const embeddingText = buildEmbeddingText(apartment);
-      const embeddingVector = embeddingService.toSqlVector(
-        await embeddingService.embedText(embeddingText),
-      );
+      try {
+        const embeddingText = buildEmbeddingText(apartment);
+        const vector = await embeddingService.embedText(embeddingText);
+        
+        // CRITICAL: Validate dimensions are 768
+        embeddingService.validateDimensions(vector, 768);
+        const embeddingVector = embeddingService.toSqlVector(vector);
 
-      await upsertEmbedding(apartment.id, embeddingVector);
-      console.log(`[embeddings] updated apartment ${apartment.id}`);
+        await upsertEmbedding(apartment.id, embeddingVector);
+        successCount++;
+        console.log(`[embeddings] ✓ Updated apartment ${apartment.id} (768d)`);
+      } catch (error: any) {
+        failureCount++;
+        console.error(`[embeddings] ✗ Failed for apartment ${apartment.id}:`, error?.message);
+      }
     }
 
-    console.log('[embeddings] generation complete');
+    console.log(`[embeddings] Generation complete: ${successCount} success, ${failureCount} failed`);
+    if (failureCount > 0) {
+      process.exitCode = 1;
+    }
   } catch (error) {
-    console.error('[embeddings] generation failed', error);
+    console.error('[embeddings] Fatal generation error', error);
     throw error;
   } finally {
     await pool.end();

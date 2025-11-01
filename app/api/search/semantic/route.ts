@@ -1,10 +1,17 @@
 /**
  * Semantic Search API Endpoint
  * Uses Google Gemini embeddings + pgvector for intelligent apartment search
+ * 
+ * Features:
+ * - LRU caching for frequent queries
+ * - Observability: search time, cache hit rate, embedding dimensions
+ * - Graceful fallback to keyword search on errors
+ * - Structured error codes for debugging
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { searchService } from '@/services/search-svc/index';
+import { getCacheStats } from '@/lib/cache/lru';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,10 +29,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use the search service for semantic search
+    // Track embedding operation timing
+    const embeddingStart = Date.now();
     const results = await searchService.semanticSearch(query, { ...filters, limit });
+    const embeddingMs = Date.now() - embeddingStart;
 
-    const searchTime = Date.now() - startTime;
+    const totalMs = Date.now() - startTime;
+    const cacheStats = getCacheStats();
+
+    // Log observability metrics
+    const metrics = {
+      embedding_ms: embeddingMs,
+      total_ms: totalMs,
+      cache_hit_rate: Number(cacheStats.hitRate.toFixed(2)),
+      cache_size: cacheStats.size,
+      powered_by: 'gemini_768d' as const,
+    };
+
+    console.log('[SemanticSearch] Metrics:', JSON.stringify(metrics));
 
     return NextResponse.json({
       success: true,
@@ -33,14 +54,40 @@ export async function POST(request: NextRequest) {
       count: results.length,
       method: 'semantic_gemini',
       model: 'text-embedding-004',
-      searchTime,
+      dimensions: 768,
+      metrics,
+      diagnostics: {
+        cacheHitRate: cacheStats.hitRate,
+        cacheSize: cacheStats.size,
+        embeddingMs,
+        totalMs,
+      },
     });
 
   } catch (error: any) {
-    console.error('Semantic search API error:', error);
+    const errorCode = error?.message?.includes('[Vector Dimension Mismatch]') 
+      ? 'VECTOR_DIM_MISMATCH' 
+      : error?.code === 'ECONNREFUSED' 
+      ? 'EMBEDDING_SERVICE_UNAVAILABLE'
+      : 'EMBEDDING_ERROR';
+
+    console.error('[SemanticSearch] Error:', {
+      code: errorCode,
+      message: error?.message,
+      totalMs: Date.now() - startTime,
+    });
     
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message, fallback: true },
+      {
+        error: 'Semantic search failed',
+        code: errorCode,
+        details: error?.message,
+        fallback: true, // Client should fall back to keyword search
+        metrics: {
+          total_ms: Date.now() - startTime,
+          powered_by: 'error_fallback' as const,
+        },
+      },
       { status: 500 }
     );
   }

@@ -249,7 +249,8 @@ export class SearchSyncService {
       for (const profile of rows) {
         const searchText = this.buildSearchText(profile);
         const embedding = await embeddingService.embedText(searchText);
-        const expanded = embeddingService.ensureDimensions(embedding, 1536);
+        // CRITICAL: Use 768 dimensions for text-embedding-004, not 1536
+        embeddingService.validateDimensions(embedding, 768);
 
         await pg.query(
           `
@@ -258,7 +259,7 @@ export class SearchSyncService {
                 updated_at = now()
             WHERE user_id = $2
           `,
-          [embeddingService.toSqlVector(expanded), profile.user_id],
+          [embeddingService.toSqlVector(embedding), profile.user_id],
         );
 
         await this.delay(50);

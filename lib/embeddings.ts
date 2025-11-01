@@ -2,12 +2,18 @@
  * Embedding service that produces semantic vectors.
  * Integrates with Google Gemini API for production embeddings.
  * Falls back to zero vectors if API is unavailable.
+ * 
+ * Features:
+ * - LRU in-process cache for high-frequency queries
+ * - Dimension validation (768 for text-embedding-004)
+ * - Fallback to keyword search when API key missing
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getEmbeddingCache, recordCacheHit, recordCacheMiss } from './cache/lru';
 
-const DEFAULT_MODEL = 'embedding-001';
-const BASE_DIMENSION = 384;
+const DEFAULT_MODEL = 'text-embedding-004';
+const BASE_DIMENSION = 768;
 const GEMINI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 
 class EmbeddingService {
@@ -22,6 +28,7 @@ class EmbeddingService {
   /**
    * Generate a normalized embedding for the supplied text.
    * Uses Google Gemini API when available, falls back to zero vector.
+   * Caches results to avoid redundant API calls.
    */
   async embedText(text: string | null | undefined): Promise<Float32Array> {
     const cleaned = (text ?? '').trim();
@@ -29,16 +36,31 @@ class EmbeddingService {
       return new Float32Array(BASE_DIMENSION);
     }
 
+    // Check cache first
+    const cache = getEmbeddingCache();
+    const cached = cache.get(cleaned);
+    if (cached) {
+      recordCacheHit();
+      return cached;
+    }
+
+    recordCacheMiss();
+
     // Try to use Gemini embeddings API
     if (this.client) {
       try {
-        const model = this.client.getGenerativeModel({ model: 'embedding-001' });
+        const model = this.client.getGenerativeModel({ model: 'text-embedding-004' });
         const result = await model.embedContent(cleaned);
         
         if (result.embedding?.values) {
-          // Convert to Float32Array
-          const embedding = new Float32Array(result.embedding.values);
-          return this.normalizeVector(embedding);
+          // Convert to Float32Array and ensure 768 dimensions
+          let embedding = new Float32Array(result.embedding.values) as Float32Array;
+          embedding = this.ensureDimensions(embedding, BASE_DIMENSION);
+          const normalized = this.normalizeVector(embedding);
+          
+          // Cache for future use
+          cache.set(cleaned, normalized);
+          return normalized;
         }
       } catch (error) {
         console.warn('Gemini embedding failed, using fallback:', error);
@@ -47,7 +69,9 @@ class EmbeddingService {
 
     // Fallback: return a zero vector
     console.warn('Embeddings service: Using fallback zero vector. Configure GOOGLE_AI_API_KEY for production embeddings.');
-    return new Float32Array(BASE_DIMENSION);
+    const fallback = new Float32Array(BASE_DIMENSION);
+    cache.set(cleaned, fallback);
+    return fallback;
   }
 
   /**
@@ -129,6 +153,18 @@ class EmbeddingService {
     } else {
       // Truncate
       return vector.slice(0, targetDimensions);
+    }
+  }
+
+  /**
+   * Validate vector dimensions and throw if mismatch
+   */
+  validateDimensions(vector: Float32Array, expectedDimensions: number = BASE_DIMENSION): void {
+    if (vector.length !== expectedDimensions) {
+      throw new Error(
+        `[Vector Dimension Mismatch] Expected ${expectedDimensions} dimensions, got ${vector.length}. ` +
+        `This may indicate an embedding model change. Rebuild embeddings with: pnpm build:embeddings`
+      );
     }
   }
 }
