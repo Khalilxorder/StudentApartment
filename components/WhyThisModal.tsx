@@ -10,7 +10,7 @@ interface Reason {
   weight?: number;
 }
 
-interface WhyThisModalProps {
+export interface WhyThisModalProps {
   isOpen: boolean;
   onClose: () => void;
   apartmentTitle: string;
