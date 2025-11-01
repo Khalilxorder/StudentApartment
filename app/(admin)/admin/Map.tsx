@@ -27,9 +27,21 @@ export default function Map({
   initialCoordinates?: Coordinates | null;
   onAddressSelect?: (address: string) => void;
 }) {
-  const { isLoaded } = useJsApiLoader({
+  const mapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
+  
+  // Runtime validation for Maps API key
+  if (!mapsApiKey) {
+    console.error(
+      'MISSING REQUIRED ENV VAR: NEXT_PUBLIC_MAPS_API_KEY\n' +
+      'Please add it to your .env.local file:\n' +
+      'NEXT_PUBLIC_MAPS_API_KEY=your-google-maps-api-key\n' +
+      'Get it from: https://console.cloud.google.com/apis/credentials'
+    );
+  }
+
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_Maps_API_KEY!,
+    googleMapsApiKey: mapsApiKey || '',
     libraries,
   });
 
@@ -97,10 +109,51 @@ export default function Map({
     advancedMarkerRef.current.position = marker;
   }, [isLoaded, marker]);
 
+  // Error handling for missing API key or load failure
+  if (loadError) {
+    return (
+      <div className="w-full h-[300px] bg-red-50 border border-red-200 rounded-lg flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-600 font-semibold mb-2">❌ Maps Failed to Load</p>
+          <p className="text-red-500 text-sm">
+            {loadError.message || 'Unknown error loading Google Maps API'}
+          </p>
+          <p className="text-red-500 text-xs mt-2">
+            Check your NEXT_PUBLIC_MAPS_API_KEY in .env.local
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mapsApiKey) {
+    return (
+      <div className="w-full h-[300px] bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-yellow-700 font-semibold mb-2">⚠️ Maps API Key Missing</p>
+          <p className="text-yellow-600 text-sm mb-2">
+            Please add your Google Maps API key to proceed
+          </p>
+          <code className="text-xs bg-yellow-100 p-2 rounded block mb-2">
+            NEXT_PUBLIC_MAPS_API_KEY=your-key-here
+          </code>
+          <a
+            href="https://console.cloud.google.com/apis/credentials"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700 underline text-sm"
+          >
+            Get API Key →
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (!isLoaded) return <div>Loading Map...</div>;
 
   return (
-    <div>
+    <div data-testid="map-container">
       <PlacesAutocomplete panTo={panTo} onAddressSelect={onAddressSelect} />
       <GoogleMap
         mapContainerStyle={containerStyle}
@@ -108,7 +161,7 @@ export default function Map({
         zoom={12}
         onLoad={onMapLoad}
         options={{
-          mapId: 'YOUR_MAP_ID_HERE', // 🔁 Replace this with your actual Map ID from Google Cloud
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || undefined,
         }}
         onClick={(e) => {
           if (e.latLng) {

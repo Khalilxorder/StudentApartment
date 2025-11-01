@@ -130,3 +130,39 @@ global.createMockResponse = (data: any, status = 200) => ({
 
 // Helper function to wait for next tick
 global.nextTick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+// ============================================
+// Google Maps API Mocks
+// ============================================
+
+// Mock Google Maps API for testing
+global.google = {
+  maps: {
+    Map: vi.fn(function(this: any, element: HTMLElement, options: any) {
+      this.panTo = vi.fn();
+      this.setZoom = vi.fn();
+      this.getZoom = vi.fn(() => 12);
+    }),
+    LatLng: vi.fn((lat: number, lng: number) => ({ lat: () => lat, lng: () => lng })),
+    marker: {
+      AdvancedMarkerElement: vi.fn(function(this: any, options: any) {
+        this.position = options.position;
+        this.map = options.map;
+        this.title = options.title;
+      }),
+    },
+    places: {
+      PlacesService: vi.fn(function(this: any, map: any) {
+        this.getDetails = vi.fn();
+        this.nearbySearch = vi.fn();
+      }),
+      AutocompleteService: vi.fn(function(this: any) {
+        this.getPlacePredictions = vi.fn();
+      }),
+    },
+  },
+} as any;
+
+// Mock environment variables for tests
+process.env.NEXT_PUBLIC_MAPS_API_KEY = 'AIzaSyDummyTestKeyForCI123456789';
+process.env.NEXT_PUBLIC_GOOGLE_MAP_ID = 'test-map-id-12345';
