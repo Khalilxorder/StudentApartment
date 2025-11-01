@@ -4,24 +4,6 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
 
-  // Skip problematic pages during static export
-  // These are dynamic pages that should only be rendered at runtime
-  skipTrailingSlashRedirect: true,
-  
-  // Exclude specific pages from static export
-  exportPathMap: async function (
-    defaultPathMap,
-    { dev, dir, outDir, distDir, buildId }
-  ) {
-    // Remove problematic dynamic pages from export
-    const pathMap = { ...defaultPathMap };
-    delete pathMap['/dashboard/messages'];
-    delete pathMap['/dashboard/profile'];
-    delete pathMap['/owner/messages'];
-    delete pathMap['/owner/profile'];
-    return pathMap;
-  },
-
   // Exclude Supabase Edge Functions from build
   webpack: (config, { isServer }) => {
     // Exclude Supabase Edge Functions from Next.js build
