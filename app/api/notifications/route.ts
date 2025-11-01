@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabaseClient';
+import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { Resend } from 'resend';
 import { emailQueue } from '@/services/notify-svc/email-queue';
 
@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const supabase = getSupabaseClient();
 
     // Check user notification preferences
     const { data: preferences } = await supabase
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send notification immediately
-    const success = await sendNotification(data.user_id, data.type, finalTitle, finalMessage, data.template_data);
+  const success = await sendNotification(data.user_id, data.type, finalTitle, finalMessage, data.template_data);
 
     if (success) {
       // Log the notification
@@ -114,6 +116,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'user_id parameter required' }, { status: 400 });
     }
 
+    const supabase = getSupabaseClient();
+
     let query = supabase
       .from('notifications')
       .select('*')
@@ -128,7 +132,7 @@ export async function GET(request: NextRequest) {
       query = query.is('read_at', null);
     }
 
-    const { data: notifications, error } = await query.limit(50);
+  const { data: notifications, error } = await query.limit(50);
 
     if (error) {
       console.error('Error fetching notifications:', error);
@@ -149,6 +153,8 @@ export async function PATCH(request: NextRequest) {
     if (!notification_ids || !Array.isArray(notification_ids)) {
       return NextResponse.json({ error: 'notification_ids array required' }, { status: 400 });
     }
+
+    const supabase = getSupabaseClient();
 
     if (action === 'mark_read') {
       const { error } = await supabase
@@ -172,6 +178,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 async function getNotificationTemplate(templateName: string, type: string) {
+  const supabase = getSupabaseClient();
   const { data: template } = await supabase
     .from('notification_templates')
     .select('*')
@@ -184,6 +191,7 @@ async function getNotificationTemplate(templateName: string, type: string) {
 }
 
 async function getTemplateId(templateName: string): Promise<string | null> {
+  const supabase = getSupabaseClient();
   const { data: template } = await supabase
     .from('notification_templates')
     .select('id')
@@ -228,6 +236,7 @@ async function sendNotification(
 ): Promise<boolean> {
   try {
     // Get user contact information
+    const supabase = getSupabaseClient();
     const { data: user } = await supabase
       .from('user_profiles')
       .select('email, phone')

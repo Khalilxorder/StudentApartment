@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
-import { stripe } from '@/lib/stripe/server';
+import { getStripe } from '@/lib/stripe/server';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -57,15 +57,13 @@ export async function GET(
       );
     }
 
-    if (!stripe) {
-      return NextResponse.json(
-        { error: 'Stripe not configured' },
-        { status: 503 }
-      );
+    const stripeClient = getStripe();
+    if (!stripeClient) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
     }
 
     // Get latest intent status from Stripe
-    const stripeIntent = await stripe.paymentIntents.retrieve(intentId);
+    const stripeIntent = await stripeClient.paymentIntents.retrieve(intentId);
 
     return NextResponse.json({
       id: stripeIntent.id,

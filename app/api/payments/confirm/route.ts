@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
-import { stripe } from '@/lib/stripe/server';
+import { getStripe } from '@/lib/stripe/server';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase();
     
+    const stripe = getStripe();
     if (!stripe) {
       return NextResponse.json(
         { error: 'Stripe not configured' },

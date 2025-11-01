@@ -5,9 +5,10 @@ function getSupabase() {
   return getSupabaseClient();
 }
 
-function getStripe() {
-  const stripe = require('stripe');
-  return stripe(process.env.STRIPE_SECRET_KEY);
+import { getStripe } from '@/lib/stripe/server';
+
+function getStripeClient() {
+  return getStripe();
 }
 
 interface PaymentIntentRequest {
@@ -24,8 +25,11 @@ interface PaymentIntentRequest {
  */
 export async function POST(request: NextRequest) {
   try {
-    const stripe = getStripe();
+    const stripe = getStripeClient();
     const supabase = getSupabase();
+    if (!stripe) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    }
     const body = (await request.json()) as PaymentIntentRequest;
     const {
       bookingId,
@@ -100,6 +104,9 @@ export async function GET(
   try {
     const stripe = getStripe();
     const supabase = getSupabase();
+    if (!stripe) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    }
     const { id } = params;
 
     const { data: intentRecord, error } = await supabase
@@ -116,7 +123,7 @@ export async function GET(
     }
 
     // Check current status with Stripe
-    const intent = await stripe.paymentIntents.retrieve(id);
+  const intent = await stripe.paymentIntents.retrieve(id);
 
     return NextResponse.json({
       success: true,

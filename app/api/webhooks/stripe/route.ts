@@ -1,17 +1,24 @@
 // Stripe Webhook Handler - Handles payment events
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { stripe } from '@/lib/stripe/server';
+import { getStripe } from '@/lib/stripe/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 // import * as Sentry from '@sentry/nextjs'; // Temporarily disabled due to parsing error
 import type Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
-  if (!stripe) {
-    return NextResponse.json(
-      { error: 'Stripe not configured' },
-      { status: 500 }
-    );
+  // Create a Stripe instance at request-time for webhook signature verification
+  // We prefer to use getStripe(), but construct a fresh instance if needed
+  let stripeInstance = getStripe();
+  if (!stripeInstance) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const StripeCtor = require('stripe') as typeof import('stripe');
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({ error: 'Stripe secret not configured' }, { status: 500 });
+    }
+    stripeInstance = new (StripeCtor as any)(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2024-06-20',
+    }) as import('stripe').Stripe;
   }
 
   const body = await request.text();
@@ -27,7 +34,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = stripeInstance.webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -225,7 +232,8 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
   if (!userId) {
     console.error(`❌ Payout blocked: No user ID in metadata for payout ${id}`);
     // Cancel the payout if no user ID
-    if (stripe) await stripe.payouts.cancel(id);
+    const stripeClient = getStripe();
+    if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 
@@ -238,28 +246,32 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
 
   if (accountError || !stripeAccount) {
     console.error(`❌ Payout blocked: No Stripe Connect account for user ${userId}`);
-    if (stripe) await stripe.payouts.cancel(id);
+    const stripeClient = getStripe();
+    if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 
   if (stripeAccount.status !== 'active') {
     console.error(`❌ Payout blocked: Stripe account not verified for user ${userId} (status: ${stripeAccount.status})`);
-    if (stripe) await stripe.payouts.cancel(id);
+    const stripeClient = getStripe();
+    if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 
   // Verify the Stripe account is still active in Stripe
   try {
-    if (!stripe) throw new Error('Stripe not configured');
-    const account = await stripe.accounts.retrieve(stripeAccount.stripe_account_id);
+    const stripeClient = getStripe();
+    if (!stripeClient) throw new Error('Stripe not configured');
+    const account = await stripeClient.accounts.retrieve(stripeAccount.stripe_account_id);
     if (!account.payouts_enabled) {
       console.error(`❌ Payout blocked: Payouts not enabled for Stripe account ${stripeAccount.stripe_account_id}`);
-      await stripe.payouts.cancel(id);
+      await stripeClient.payouts.cancel(id);
       return;
     }
   } catch (error) {
     console.error(`❌ Payout blocked: Error verifying Stripe account ${stripeAccount.stripe_account_id}:`, error);
-    if (stripe) await stripe.payouts.cancel(id);
+    const stripeClient = getStripe();
+    if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 

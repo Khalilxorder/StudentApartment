@@ -431,7 +431,8 @@ export default function ChatSearch() {
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story: sanitizedStory })
+        body: JSON.stringify({ story: sanitizedStory }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       });
       
       if (response.ok) {
@@ -439,12 +440,29 @@ export default function ChatSearch() {
         console.log('✅ Gemini AI response:', analysis);
         Object.assign(localParse, analysis);
         pushMessage('system', '🤖 AI analysis complete');
+      } else if (response.status === 503) {
+        // Service unavailable - likely missing API key
+        console.error('❌ Gemini AI service unavailable (503). Check GOOGLE_AI_API_KEY environment variable.');
+        pushMessage('system', '⚠️ AI service unavailable - using local parsing. Please configure GOOGLE_AI_API_KEY for production.');
+      } else if (response.status === 429) {
+        // Rate limited
+        console.error('❌ Gemini API rate limited');
+        pushMessage('system', '⚠️ AI service rate limited - using local parsing');
+      } else if (response.status === 500 || response.status === 502) {
+        // Server error
+        console.error(`❌ Gemini API server error (${response.status})`);
+        pushMessage('system', '⚠️ AI service error - using local parsing');
       } else {
-        throw new Error('AI API request failed');
+        throw new Error(`AI API request failed: ${response.status} ${response.statusText}`);
       }
-    } catch (err) {
-      console.error('❌ Gemini AI failed:', err);
-      pushMessage('system', '⚠️ Using local parsing (AI unavailable)');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.error('❌ Gemini AI request timeout');
+        pushMessage('system', '⚠️ AI request timeout - using local parsing');
+      } else {
+        console.error('❌ Gemini AI failed:', err?.message);
+        pushMessage('system', `⚠️ Using local parsing (AI unavailable: ${err?.message || 'unknown error'})`);
+      }
     }
 
     let apartments = await fetchApartments(localParse);

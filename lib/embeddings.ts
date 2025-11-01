@@ -8,7 +8,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const DEFAULT_MODEL = 'embedding-001';
 const BASE_DIMENSION = 384;
-const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 
 class EmbeddingService {
   private client: GoogleGenerativeAI | null = null;
@@ -46,7 +46,7 @@ class EmbeddingService {
     }
 
     // Fallback: return a zero vector
-    console.warn('Embeddings service: Using fallback zero vector. Configure GOOGLE_GEMINI_API_KEY for production embeddings.');
+    console.warn('Embeddings service: Using fallback zero vector. Configure GOOGLE_AI_API_KEY for production embeddings.');
     return new Float32Array(BASE_DIMENSION);
   }
 

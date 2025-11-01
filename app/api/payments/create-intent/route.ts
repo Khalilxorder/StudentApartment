@@ -1,6 +1,6 @@
 // Payment Intent API - Creates Stripe payment intent for booking
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, STRIPE_CONFIG, isStripeConfigured } from '@/lib/stripe/server';
+import { getStripe, STRIPE_CONFIG, isStripeConfigured } from '@/lib/stripe/server';
 import { createClient } from '@/utils/supabaseClient';
 import { bookingSchema, validateInput } from '@/lib/validation/schemas';
 // import * as Sentry from '@sentry/nextjs'; // Temporarily disabled due to parsing error
@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Create Stripe Payment Intent
-    if (!stripe) {
+    const stripeClient = getStripe();
+    if (!stripeClient) {
       logResponse('POST', '/api/payments/create-intent', 500, Date.now() - startTime);
       return NextResponse.json(
         { error: 'Stripe client not initialized' },
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await stripeClient.paymentIntents.create({
       amount: Math.round(totalAmount), // Stripe requires integers (1 HUF = 1 unit)
       currency: STRIPE_CONFIG.currency,
       automatic_payment_methods: {

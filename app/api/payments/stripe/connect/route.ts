@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabaseClient';
-import { stripe } from '@/lib/stripe/server';
+import { getStripe } from '@/lib/stripe/server';
 
 interface ConnectAccountRequest {
   userId: string;
@@ -36,7 +36,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new Stripe Connect account
-    const account = await stripe!.accounts.create({
+    const stripeClient = getStripe();
+    if (!stripeClient) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    }
+
+    const account = await stripeClient.accounts.create({
       type: 'express',
       country,
       email,
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate onboarding link
-    const link = await stripe!.accountLinks.create({
+    const link = await stripeClient.accountLinks.create({
       account: account.id,
       type: 'account_onboarding',
       refresh_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/owner/onboarding/refresh`,
@@ -124,7 +129,12 @@ export async function GET(
     }
 
     // Check Stripe account status
-    const stripeAccount = await stripe!.accounts.retrieve(
+    const stripeClient = getStripe();
+    if (!stripeClient) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    }
+
+    const stripeAccount = await stripeClient.accounts.retrieve(
       account.stripe_account_id
     );
 

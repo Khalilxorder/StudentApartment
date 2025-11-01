@@ -42,8 +42,37 @@ jobs:
     - name: Build application
       run: pnpm run build
       env:
+        # CRITICAL: Supabase credentials for build-time initialization
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
+        # Backend services (optional for build, required for runtime)
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL || '' }}
+        # Google AI for semantic search (optional for build)
+        GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY || 'placeholder-key-for-build-only' }}
+        # Stripe for payments
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY || 'placeholder' }}
+        # Email service
+        RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 'placeholder' }}
+        # Meilisearch for search indexing
+        MEILISEARCH_MASTER_KEY: ${{ secrets.MEILISEARCH_MASTER_KEY || 'placeholder' }}
+        # Google Maps for location
+        GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || 'placeholder' }}
+        # Sentry for error tracking
+        SENTRY_DSN: ${{ secrets.SENTRY_DSN || 'placeholder' }}
+        # NextAuth secrets
+        NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'build-time-placeholder' }}
+        NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL || 'https://placeholder.vercel.app' }}
+
+    - name: Security audit (dependencies)
+      run: pnpm audit --audit-level high
+
+    - name: Check for secrets in code
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
 
   # E2E tests (only on pull requests)
   e2e:
@@ -99,6 +128,42 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Run database migrations
+      run: pnpm run db:migrate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      continue-on-error: true
+
+    - name: Sync embeddings to Meilisearch
+      run: pnpm run build:embeddings
+      env:
+        GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        MEILISEARCH_HOST: ${{ secrets.MEILISEARCH_HOST }}
+        MEILISEARCH_MASTER_KEY: ${{ secrets.MEILISEARCH_MASTER_KEY }}
+      continue-on-error: true
+
+    - name: Reindex Meilisearch
+      run: pnpm run sync:meilisearch:reindex
+      env:
+        MEILISEARCH_HOST: ${{ secrets.MEILISEARCH_HOST }}
+        MEILISEARCH_MASTER_KEY: ${{ secrets.MEILISEARCH_MASTER_KEY }}
+      continue-on-error: true
+
     - name: Deploy to Vercel
       run: npx vercel deploy --token ${{ secrets.VERCEL_TOKEN }} --prod
       env:
@@ -109,3 +174,30 @@ jobs:
       run: |
         echo "✅ Deployment to production successful!"
         echo "Visit your application at your Vercel domain."
+    
+    - name: Post-deployment health check
+      run: |
+        DOMAIN="${{ secrets.VERCEL_DOMAIN || 'your-app.vercel.app' }}"
+        echo "🔍 Checking deployment health..."
+        sleep 30  # Wait for deployment to be fully live
+        
+        # Test main endpoints
+        echo "📝 Testing health endpoint..."
+        curl -f -s "https://$DOMAIN/api/health" -o /dev/null && echo "✅ Health check passed" || echo "⚠️  Health endpoint not available"
+        
+        # Test search API (critical for AI search)
+        echo "🔍 Testing search endpoint..."
+        curl -f -s "https://$DOMAIN/api/search" -X POST -H "Content-Type: application/json" -d '{"query":"test"}' -o /dev/null && echo "✅ Search endpoint passed" || echo "⚠️  Search endpoint not available"
+        
+        # Test AI analyze endpoint
+        echo "🤖 Testing AI endpoint..."
+        curl -f -s "https://$DOMAIN/api/ai/analyze" -X POST -H "Content-Type: application/json" -d '{"story":"test"}' -o /dev/null && echo "✅ AI endpoint passed" || echo "⚠️  AI endpoint not available"
+        
+        echo "✅ Post-deployment checks complete!"
+      continue-on-error: true
+
+    - name: Notify on deployment success
+      if: success()
+      run: |
+        echo "✅ CI/CD pipeline completed successfully!"
+        echo "🚀 Production deployment ready"

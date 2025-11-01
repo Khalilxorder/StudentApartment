@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
-import { stripe } from '@/lib/stripe/server';
+import { getStripe } from '@/lib/stripe/server';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -36,11 +36,9 @@ export async function POST(
       );
     }
 
-    if (!stripe) {
-      return NextResponse.json(
-        { error: 'Stripe not configured' },
-        { status: 503 }
-      );
+    const stripeClient = getStripe();
+    if (!stripeClient) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
     }
 
     // Get or create Stripe Connect account
@@ -61,7 +59,7 @@ export async function POST(
 
     // Create new Stripe account if needed
     if (!stripeAccountId) {
-      const account = await stripe.accounts.create({
+  const account = await stripeClient.accounts.create({
         type: 'express',
         email: userData.email || undefined,
         metadata: {
@@ -79,7 +77,7 @@ export async function POST(
     }
 
     // Create account link for onboarding
-    const accountLink = await stripe.accountLinks.create({
+  const accountLink = await stripeClient.accountLinks.create({
       account: stripeAccountId,
       type: 'account_onboarding',
       refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/owner/onboarding?refresh=true`,
@@ -128,11 +126,9 @@ export async function GET(
       );
     }
 
-    if (!stripe) {
-      return NextResponse.json(
-        { error: 'Stripe not configured' },
-        { status: 503 }
-      );
+    const stripeClient = getStripe();
+    if (!stripeClient) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
     }
 
     const { data: userData, error: userError } = await supabase
@@ -157,7 +153,7 @@ export async function GET(
     }
 
     // Get account details from Stripe
-    const account = await stripe.accounts.retrieve(userData.stripe_account_id);
+  const account = await stripeClient.accounts.retrieve(userData.stripe_account_id);
 
     return NextResponse.json({
       connected: true,
