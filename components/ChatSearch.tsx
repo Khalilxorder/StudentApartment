@@ -524,7 +524,25 @@ export default function ChatSearch() {
     // Sort by feature score first to get best candidates for AI scoring
     scored.sort((a: any, b: any) => b.featureMatchScore - a.featureMatchScore);
 
-    // Apply AI scoring to top candidates
+    // Show results immediately - skip AI scoring to avoid hanging
+    // (AI already analyzed user preferences, feature matching is sufficient)
+    try {
+      if (scored.length > 0) {
+        setCurrentResults(scored);
+        const topScore = scored[0]?.featureMatchScore || 0;
+        pushMessage('ai', `✅ Found ${scored.length} apartments! Top match: ${Math.round(topScore)}% 🎯`);
+      } else {
+        pushMessage('ai', `❌ No apartments found matching your criteria.`);
+      }
+    } catch (err) {
+      console.error('❌ Error displaying results:', err);
+      setCurrentResults(scored);
+      pushMessage('ai', `Found ${scored.length} apartments!`);
+    }
+
+    // SKIPPED: AI per-apartment scoring (commented out - was causing hangs)
+    // The initial AI analysis of user preferences + feature matching is sufficient
+    /*
     try {
       console.log('🤖 Starting AI scoring for top', Math.min(20, scored.length), 'apartments...');
       const topCandidates = scored.slice(0, Math.min(20, scored.length));
@@ -600,6 +618,7 @@ export default function ChatSearch() {
       setCurrentResults(scored);
       pushMessage('ai', `Found ${scored.length} apartments!`);
     }
+    */
 
     try {
       const response = await fetch('/api/ai/followup', {
