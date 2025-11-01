@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Use standalone output for Vercel deployment
-  output: 'standalone',
-  
   // Performance optimizations
   poweredByHeader: false,
   compress: true,
