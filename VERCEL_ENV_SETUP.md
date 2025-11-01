@@ -218,6 +218,97 @@ After adding variables and redeploying:
 
 ---
 
+## 🔍 Environment Validation System
+
+### Runtime Validation
+
+The application validates all required environment variables at startup. If any are missing, you'll see a helpful error message:
+
+```
+╔════════════════════════════════════════════════════════╗
+║  ⚠️  ENVIRONMENT VALIDATION FAILED                      ║
+╚════════════════════════════════════════════════════════╝
+
+The following required environment variables are missing:
+  ❌ Missing required environment variable: GOOGLE_AI_API_KEY
+  ❌ Missing required environment variable: NEXT_PUBLIC_MAPS_API_KEY
+```
+
+### Checking Individual APIs
+
+Use this to verify which services are configured:
+
+```javascript
+// In your code or console
+import { isApiConfigured } from '@/lib/env-validation';
+
+isApiConfigured('google-ai');        // true if GOOGLE_AI_API_KEY set
+isApiConfigured('maps');             // true if NEXT_PUBLIC_MAPS_API_KEY set
+isApiConfigured('stripe');           // true if STRIPE_SECRET_KEY set
+isApiConfigured('meilisearch');      // true if MEILISEARCH_HOST set
+isApiConfigured('supabase');         // true if NEXT_PUBLIC_SUPABASE_URL set
+```
+
+### Getting Setup Instructions
+
+```javascript
+import { getSetupInstructions } from '@/lib/env-validation';
+
+console.log(getSetupInstructions('google-ai'));
+console.log(getSetupInstructions('stripe'));
+```
+
+---
+
+## 📊 Complete Environment Variables Reference
+
+### Required Variables
+
+| Variable | Type | Purpose | Get From |
+|----------|------|---------|----------|
+| NEXT_PUBLIC_SUPABASE_URL | Public | Database URL | https://app.supabase.com → Settings → API |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Public | Client auth key | https://app.supabase.com → Settings → API |
+| SUPABASE_SERVICE_ROLE_KEY | Secret | Server operations | https://app.supabase.com → Settings → API |
+| GOOGLE_AI_API_KEY | Secret | Text embeddings | https://aistudio.google.com/app/apikey |
+| NEXT_PUBLIC_MAPS_API_KEY | Public | Maps display | https://console.cloud.google.com/apis/credentials |
+| MEILISEARCH_HOST | Secret | Search engine | http://localhost:7700 (local) or cloud instance |
+| MEILISEARCH_API_KEY | Secret | Search auth | From Meilisearch dashboard |
+| DATABASE_URL | Secret | Migrations/scripts | https://app.supabase.com → Settings → Database |
+| NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY | Public | Payment UI | https://dashboard.stripe.com/apikeys |
+| STRIPE_SECRET_KEY | Secret | Payment processing | https://dashboard.stripe.com/apikeys |
+
+### Optional Variables
+
+| Variable | Type | Purpose | Get From |
+|----------|------|---------|----------|
+| NEXT_PUBLIC_GOOGLE_MAP_ID | Public | Custom map styling | https://console.cloud.google.com/maps/api/datasets |
+| STRIPE_WEBHOOK_SECRET | Secret | Webhook validation | https://dashboard.stripe.com/webhooks |
+| REDIS_URL | Secret | Caching (future) | Upstash or local Redis |
+| SENTRY_DSN | Secret | Error tracking (future) | https://sentry.io |
+
+---
+
+## ✅ Validation Checklist
+
+Before deploying to production:
+
+- [ ] All required variables in `.env.local` for local development
+- [ ] All required variables in Vercel project settings
+- [ ] Using test/development API keys for staging
+- [ ] No .env.local file committed to git
+- [ ] .env.example has all required variables documented
+- [ ] Environment variables are marked as public (NEXT_PUBLIC_) or secret appropriately
+- [ ] Redeployed after adding environment variables
+- [ ] App loads without validation errors
+
+---
+
 **Current Status**: Build ✅ SUCCESS | Runtime ❌ NEEDS ENV VARS
 
-**Next Action**: Add environment variables in Vercel and redeploy!
+**Next Action**: 
+1. Review the environment variables list above
+2. Add them in Vercel Settings → Environment Variables
+3. Redeploy your project
+4. Check application logs for validation success
+
+```
