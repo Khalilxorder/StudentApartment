@@ -2,6 +2,10 @@ import { expect, afterEach, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { vi } from 'vitest';
+import * as dotenv from 'dotenv';
+
+// Load .env.local before running tests
+dotenv.config({ path: '.env.local' });
 
 // Extend expect with jest-dom matchers
 expect.extend(matchers);
@@ -77,15 +81,6 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
-}));
-
-// Mock environment variables
-vi.mock('process.env', () => ({
-  NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
-  RESEND_API_KEY: 'test-resend-key',
-  STRIPE_SECRET_KEY: 'sk_test_...',
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_...',
 }));
 
 // Global test utilities
