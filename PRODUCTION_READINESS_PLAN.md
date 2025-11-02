@@ -35,9 +35,9 @@
 **Exposed Keys**:
 ```bash
 # ❌ EXPOSED IN COMMITTED FILES
-GOOGLE_AI_API_KEY=AIzaSyDTEpcF-_7TcZxr2Wem5jKTFcfdyjIqfIE
-GOOGLE_SIGN_IN_API_KEY=AIzaSyBtObQsfdphJTK0OmoMhSDNmvTZEj3JvZI
-NEXT_PUBLIC_MAPS_API_KEY=AIzaSyCUvpM6WTRtAm_TrbOqXUAAN6FPh4F4YAU
+GOOGLE_AI_API_KEY=AIzaSy_REDACTED_EXAMPLE_KEY_32chars
+GOOGLE_SIGN_IN_API_KEY=AIzaSy_REDACTED_SIGNIN_KEY_32chars
+NEXT_PUBLIC_MAPS_API_KEY=AIzaSy_REDACTED_MAPS_KEY_32chars
 STRIPE_SECRET_KEY=sk_test_51RWNjuFMyBo3jno... (partial but traceable)
 ```
 
@@ -68,7 +68,7 @@ git push origin main
 ### 2. **Google AI API Quota Exceeded** (Production Down)
 
 **Impact**: Users see "⚠️ AI service error - using local parsing" on Vercel  
-**Root Cause**: Free tier quota exhausted on `AIzaSyDTEpcF-_7TcZxr2Wem5jKTFcfdyjIqfIE`  
+**Root Cause**: Free tier quota exhausted on `AIzaSy_REDACTED_EXAMPLE_KEY_32chars`  
 **Test Evidence**: Earlier logs show `429 - You exceeded your current quota`
 
 **Fix Options**:
@@ -245,9 +245,9 @@ Test-NetConnection -ComputerName db.kdlxbtuovimrouwuxoyc.supabase.co -Port 5432
 ```bash
 # Google AI API Keys
 1. Visit https://console.cloud.google.com/apis/credentials
-2. Find key: AIzaSyDTEpcF-_7TcZxr2Wem5jKTFcfdyjIqfIE → Delete
-3. Find key: AIzaSyBtObQsfdphJTK0OmoMhSDNmvTZEj3JvZI → Delete
-4. Find key: AIzaSyCUvpM6WTRtAm_TrbOqXUAAN6FPh4F4YAU → Delete
+2. Find key: AIzaSy_REDACTED_EXAMPLE_KEY_32chars → Delete
+3. Find key: AIzaSy_REDACTED_SIGNIN_KEY_32chars → Delete
+4. Find key: AIzaSy_REDACTED_MAPS_KEY_32chars → Delete
 
 # Stripe (if partially exposed)
 5. Visit https://dashboard.stripe.com/test/apikeys

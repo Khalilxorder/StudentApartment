@@ -9,7 +9,7 @@ OLD (Wrong):
 GOOGLE_AI_API_KEY=placeholder-gemini-key  ← This is a placeholder, not real!
 
 NEW (Fixed):
-GOOGLE_AI_API_KEY=AIzaSyD2Tvy5Hsry8tAFpVdFEB2oZBLzfmvbKLQ  ← Real key!
+GOOGLE_AI_API_KEY=AIzaSy_REDACTED_OLD_KEY_32chars  ← Real key!
 ```
 
 ---
@@ -18,7 +18,7 @@ GOOGLE_AI_API_KEY=AIzaSyD2Tvy5Hsry8tAFpVdFEB2oZBLzfmvbKLQ  ← Real key!
 
 | Variable | Before | After | Status |
 |----------|--------|-------|--------|
-| `GOOGLE_AI_API_KEY` | `placeholder-gemini-key` | `AIzaSyD2Tvy5Hsry8tAFpVdFEB2oZBLzfmvbKLQ` | ✅ Fixed |
+| `GOOGLE_AI_API_KEY` | `placeholder-gemini-key` | `AIzaSy_REDACTED_OLD_KEY_32chars` | ✅ Fixed |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://placeholder.supabase.co` | `https://kdlxbtuovimrouwuxoyc.supabase.co` | ✅ Fixed |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `placeholder-key` | `eyJhbGciOi...` (real JWT) | ✅ Fixed |
 | `NEXT_PUBLIC_MAPS_API_KEY` | `placeholder-maps-key` | `AIzaSyCUvpM6...` (real key) | ✅ Fixed |
