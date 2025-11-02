@@ -21,9 +21,9 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 // Request deduplication to prevent duplicate parallel requests
 const pendingRequests = new Map<string, Promise<any>>();
 
-// Timeout configurations
-const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
-const EMBEDDING_TIMEOUT_MS = 15000; // 15 seconds for embeddings
+// Timeout configurations - Increased for better reliability
+const DEFAULT_TIMEOUT_MS = 60000; // 60 seconds (increased from 30)
+const EMBEDDING_TIMEOUT_MS = 30000; // 30 seconds for embeddings (increased from 15)
 
 /**
  * Execute with timeout and circuit breaker protection
@@ -58,13 +58,13 @@ function hashUserProfile(userProfile: any): string {
   return Buffer.from(key).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
 }
 
-// Models available - FIXED: Using gemini-2.5-flash-lite-preview
-// Note: This is the current working model for the project
+// Models available - FIXED: Using gemini-2.5-flash (fastest and most capable)
+// Note: Available models verified on November 2, 2025
 export const MODELS = {
-  TEXT: 'gemini-2.5-flash-lite-preview', // Current working model
-  FLASH: 'gemini-2.5-flash-lite-preview', // Current working model
-  FLASH_PREVIEW: 'gemini-2.5-flash-lite-preview', // Current working model
-  PRO: 'gemini-2.5-flash-lite-preview' // Current working model
+  TEXT: 'gemini-2.5-flash', // Fastest and most capable Flash model
+  FLASH: 'gemini-2.5-flash', // Fastest and most capable Flash model
+  FLASH_PREVIEW: 'gemini-2.5-flash', // Fastest and most capable Flash model
+  PRO: 'gemini-2.5-pro' // Pro model for complex queries
 } as const;
 
 // Generate response from text prompt using REST API with parallel failover + circuit breaker
@@ -80,9 +80,11 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     return pendingRequests.get(requestHash)!;
   }
   
-  // FIXED: Use gemini-2.5-flash-lite-preview model
+  // FIXED: Use working Gemini models (verified November 2, 2025)
   const modelsToTry = [
-    'gemini-2.5-flash-lite-preview',    // Current working model
+    'gemini-2.5-flash',      // Primary: Fastest and most capable
+    'gemini-2.0-flash-exp',  // Fallback: Experimental 2.0
+    'gemini-2.0-flash',      // Fallback: Stable 2.0
   ];
 
   const makeRequest = async (): Promise<string> => {

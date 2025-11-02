@@ -1,8 +1,8 @@
 /* @vitest-environment node */
 
 process.env.GOOGLE_AI_API_KEY = 'test-key';
-process.env.GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash-lite-preview';
-process.env.GEMINI_MODEL_FALLBACKS = 'gemini-2.5-flash-lite-preview';
+process.env.GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash';
+process.env.GEMINI_MODEL_FALLBACKS = 'gemini-2.0-flash-exp';
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 

@@ -4,7 +4,18 @@ import { analyzeUserStory } from '@/utils/gemini';
 // This runs on the server, so API key is safe
 export async function POST(request: NextRequest) {
   try {
-    const { story } = await request.json();
+    // Clone the request to read body
+    const body = await request.text();
+    console.log('📥 Received request body:', body || '(empty)');
+    
+    if (!body) {
+      return NextResponse.json(
+        { error: 'Request body is empty' },
+        { status: 400 }
+      );
+    }
+
+    const { story } = JSON.parse(body);
 
     if (!story || typeof story !== 'string') {
       return NextResponse.json(
