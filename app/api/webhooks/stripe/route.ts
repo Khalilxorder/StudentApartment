@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
   // We prefer to use getStripe(), but construct a fresh instance if needed
   let stripeInstance = getStripe();
   if (!stripeInstance) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const StripeCtor = require('stripe') as typeof import('stripe');
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json({ error: 'Stripe secret not configured' }, { status: 500 });

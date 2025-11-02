@@ -12,7 +12,6 @@ export function getStripe(): Stripe | null {
   if (!key) return null;
 
   // Require at runtime so import doesn't instantiate during static analysis
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const StripeCtor = require('stripe') as typeof import('stripe');
   _stripe = new (StripeCtor as any)(key, {
     apiVersion: '2024-06-20',
