@@ -32,6 +32,11 @@ describe('Google Maps Configuration & Validation', () => {
   describe('API Key Validation', () => {
     it('should warn when NEXT_PUBLIC_MAPS_API_KEY is missing', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Save and temporarily remove the env var to test warning
+      const originalKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
+      delete process.env.NEXT_PUBLIC_MAPS_API_KEY;
+      
       const mapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
       // Simulate missing key check
@@ -45,6 +50,11 @@ describe('Google Maps Configuration & Validation', () => {
       }
 
       expect(consoleSpy).toHaveBeenCalled();
+      
+      // Restore original value
+      if (originalKey) {
+        process.env.NEXT_PUBLIC_MAPS_API_KEY = originalKey;
+      }
       consoleSpy.mockRestore();
     });
 

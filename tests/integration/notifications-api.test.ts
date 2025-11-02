@@ -32,10 +32,20 @@ const createMockQuery = (result: any = {}) => {
 
 const mockSupabase = {
   from: vi.fn(),
+  auth: {
+    getUser: vi.fn().mockResolvedValue({
+      data: { user: { id: 'test-user-id', email: 'test@example.com' } },
+      error: null
+    })
+  }
 };
 
 vi.mock('@/utils/supabaseClient', () => ({
   supabase: mockSupabase,
+}));
+
+vi.mock('@/lib/supabase-build-safe', () => ({
+  getSupabaseClient: vi.fn(() => mockSupabase)
 }));
 
 // Mock Resend
