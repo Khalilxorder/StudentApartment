@@ -1,11 +1,13 @@
+import fs from 'node:fs';
 import { expect, afterEach, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { vi } from 'vitest';
 import * as dotenv from 'dotenv';
 
-// Load .env.local before running tests
-dotenv.config({ path: '.env.local' });
+// Load deterministic test env if available (fallback to .env.local)
+const envPath = fs.existsSync('.env.test') ? '.env.test' : '.env.local';
+dotenv.config({ path: envPath });
 
 // Extend expect with jest-dom matchers
 expect.extend(matchers);

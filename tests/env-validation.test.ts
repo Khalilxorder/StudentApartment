@@ -38,6 +38,9 @@ describe('Environment Validation System', () => {
       REQUIRED_ENV_VARS.required.forEach(varName => {
         process.env[varName] = `mock-${varName}`;
       });
+      (REQUIRED_ENV_VARS.prodOnly ?? []).forEach(varName => {
+        process.env[varName] = `mock-${varName}`;
+      });
 
       const result = validateEnvironment('development');
       expect(result.isValid).toBe(true);
@@ -46,6 +49,9 @@ describe('Environment Validation System', () => {
 
     it('should validate production-only requirements', () => {
       REQUIRED_ENV_VARS.required.forEach(varName => {
+        process.env[varName] = `mock-${varName}`;
+      });
+      (REQUIRED_ENV_VARS.prodOnly ?? []).forEach(varName => {
         process.env[varName] = `mock-${varName}`;
       });
 
@@ -96,6 +102,9 @@ describe('Environment Validation System', () => {
 
     it('should not throw when all required vars are set', () => {
       REQUIRED_ENV_VARS.required.forEach(varName => {
+        process.env[varName] = `mock-${varName}`;
+      });
+      (REQUIRED_ENV_VARS.prodOnly ?? []).forEach(varName => {
         process.env[varName] = `mock-${varName}`;
       });
 

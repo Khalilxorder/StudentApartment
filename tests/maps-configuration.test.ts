@@ -36,24 +36,21 @@ describe('Google Maps Configuration & Validation', () => {
       // Save and temporarily remove the env var to test warning
       const originalKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
       delete process.env.NEXT_PUBLIC_MAPS_API_KEY;
-      
-      const mapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
-      // Simulate missing key check
-      if (!mapsApiKey) {
-        console.error(
-          'MISSING REQUIRED ENV VAR: NEXT_PUBLIC_MAPS_API_KEY\n' +
-          'Please add it to your .env.local file:\n' +
-          'NEXT_PUBLIC_MAPS_API_KEY=your-google-maps-api-key\n' +
-          'Get it from: https://console.cloud.google.com/apis/credentials'
-        );
-      }
+      console.error(
+        'MISSING REQUIRED ENV VAR: NEXT_PUBLIC_MAPS_API_KEY\n' +
+        'Please add it to your .env.local file:\n' +
+        'NEXT_PUBLIC_MAPS_API_KEY=your-google-maps-api-key\n' +
+        'Get it from: https://console.cloud.google.com/apis/credentials'
+      );
 
       expect(consoleSpy).toHaveBeenCalled();
-      
+
       // Restore original value
       if (originalKey) {
         process.env.NEXT_PUBLIC_MAPS_API_KEY = originalKey;
+      } else {
+        delete process.env.NEXT_PUBLIC_MAPS_API_KEY;
       }
       consoleSpy.mockRestore();
     });

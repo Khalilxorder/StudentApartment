@@ -16,28 +16,11 @@ import SearchOriginBadge, {
   type SearchOrigin
 } from './SearchOriginBadge';
 import WhyThisModal from './WhyThisModal';
-
-type Message = {
-  id: string;
-  from: 'user' | 'ai' | 'system';
-  text: string;
-};
+import ChatHistory from './chat-search/ChatHistory';
+import ChatControls from './chat-search/ChatControls';
+import type { Message, WhyModalState } from './chat-search/types';
 
 const EXPLAIN_WEIGHTS = [0.85, 0.7, 0.55];
-
-type WhyModalState = {
-  apartmentId: string;
-  apartmentTitle: string;
-  score: number;
-  origin: SearchOrigin;
-  reasons: { factor: string; description: string; weight?: number }[];
-  aiReasons: string[];
-  scoreComponents: {
-    aiScore?: number | null;
-    featureMatchScore?: number | null;
-    semanticScore?: number | null;
-  };
-};
 
 function buildExplainReasons(
   reasons: string[] | undefined,
@@ -692,6 +675,22 @@ export default function ChatSearch() {
     setQuery('');
   };
 
+  const handleClear = () => {
+    setCurrentResults([]);
+    setDisplayedResults([]);
+    setMessages([]);
+    setFollowUps([]);
+    setAskedQuestions([]);
+    setUserWishedFeatures([]);
+    setChatExpanded(false);
+    setCurrentPage(1);
+    setWhyModalState(null);
+    setLastQuery('');
+    localStorage.removeItem('chatSearch_results');
+    localStorage.removeItem('chatSearch_messages');
+    localStorage.removeItem('chatSearch_features');
+  };
+
   return (
     <div className="flex flex-col min-h-screen w-full bg-gradient-to-b from-gray-50 to-white">
       {currentResults.length === 0 ? (
@@ -1058,97 +1057,24 @@ export default function ChatSearch() {
             onMouseLeave={() => !chatExpanded && setChatHovered(false)}
           >
             {/* Chat history - only visible when expanded or hovered */}
-            {messages.length > 0 && (chatExpanded || chatHovered) && (
-              <div className="px-6 py-2 border-b bg-gray-50 max-h-56 overflow-y-auto">
-                <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center justify-between sticky top-0 bg-gray-50">
-                  <span>💬 Chat ({messages.length})</span>
-                  <button 
-                    onClick={() => setChatExpanded(!chatExpanded)}
-                    className="text-xs px-2 py-1 bg-white hover:bg-gray-200 text-gray-700 rounded border transition"
-                  >
-                    {chatExpanded ? 'Collapse ▲' : 'Expand ▼'}
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {(chatExpanded ? messages : messages.slice(-3)).map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'} text-xs`}>
-                      {msg.from === 'ai' && (
-                        <div className="w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center mr-2 flex-shrink-0 text-xs font-bold">AI</div>
-                      )}
-                      <div className={`max-w-xs px-2 py-1 rounded ${
-                        msg.from === 'user' ? 'bg-orange-500 text-white rounded-br-none' : 
-                        msg.from === 'ai' ? 'bg-gray-200 text-gray-900 rounded-bl-none' : 
-                        'bg-yellow-100 text-yellow-900'
-                      }`}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <ChatHistory
+              messages={messages}
+              chatExpanded={chatExpanded}
+              chatHovered={chatHovered}
+              onToggleExpand={() => setChatExpanded(prev => !prev)}
+            />
 
-            {/* Input box - ALWAYS VISIBLE */}
-            <div className="px-6 py-3">
-              <form onSubmit={handleSubmit} className="flex gap-2">
-                <input
-                  type="text"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  onFocus={() => setChatHovered(true)}
-                  className="flex-1 border-2 border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
-                  placeholder="Tell me what you're looking for..."
-                  disabled={loading}
-                />
-                <button 
-                  type="submit" 
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-full transition disabled:opacity-50 font-medium text-sm flex-shrink-0"
-                  disabled={loading || !query.trim()}
-                >
-                  {loading ? '⏳' : '🔍'}
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setCurrentResults([]);
-                    setDisplayedResults([]);
-                    setMessages([]);
-                    setFollowUps([]);
-                    setAskedQuestions([]);
-                    setUserWishedFeatures([]);
-                    setChatExpanded(false);
-                    setCurrentPage(1);
-                    setWhyModalState(null);
-                    setLastQuery('');
-                    localStorage.removeItem('chatSearch_results');
-                    localStorage.removeItem('chatSearch_messages');
-                    localStorage.removeItem('chatSearch_features');
-                  }}
-                  className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-full transition text-lg flex-shrink-0 font-bold"
-                  title="Return to home and clear search"
-                >
-                  🏠
-                </button>
-              </form>
-
-              {/* Follow-up suggestions - only when expanded */}
-              {followUps.length > 0 && chatExpanded && (
-                <div className="mt-3">
-                  <div className="text-xs text-gray-600 mb-2">💡 Suggestions:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {followUps.map((q, i) => (
-                      <button 
-                        key={i}
-                        onClick={() => handleSubmit(undefined, q)} 
-                        className="text-xs bg-gray-100 hover:bg-orange-50 px-2 py-1 rounded border hover:border-orange-300 transition"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <ChatControls
+              query={query}
+              loading={loading}
+              followUps={followUps}
+              chatExpanded={chatExpanded}
+              onQueryChange={setQuery}
+              onFocusInput={() => setChatHovered(true)}
+              onSubmit={event => handleSubmit(event)}
+              onFollowUpClick={question => handleSubmit(undefined, question)}
+              onClear={handleClear}
+            />
           </div>
         </>
       )}

@@ -63,7 +63,7 @@ describe('Notifications API Integration Tests', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   describe.skip('POST /api/notifications', () => {
