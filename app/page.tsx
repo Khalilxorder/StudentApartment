@@ -66,24 +66,45 @@ export default async function HomePage({
     // If user is authenticated, redirect with smart routing
     if (user) {
       // Support redirect parameter for post-login flow
-      const redirectTo = searchParams?.redirect || '/dashboard'
+      const redirectTo = searchParams?.redirect
       
       // Validate redirect is internal (security: prevent open redirect)
-      const isInternalRedirect = redirectTo.startsWith('/') && !redirectTo.startsWith('//')
-      const safeRedirect = isInternalRedirect ? redirectTo : '/dashboard'
+      const hasValidRedirect = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+      
+      // Check user role for role-based routing
+      let safeRedirect = '/dashboard' // Default for students
+      
+      try {
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        const role = userRecord?.role
+
+        // Role-based default redirects
+        if (role === 'owner') {
+          safeRedirect = '/owner/dashboard'
+        } else if (role === 'admin') {
+          safeRedirect = '/admin/dashboard'
+        } else {
+          // Student or unspecified role
+          safeRedirect = '/dashboard'
+        }
+
+        // Override with explicit redirect if provided and valid
+        if (hasValidRedirect) {
+          safeRedirect = redirectTo
+        }
+
+      } catch (roleError) {
+        console.warn('Could not determine user role, using default redirect', roleError)
+        safeRedirect = hasValidRedirect ? redirectTo : '/dashboard'
+      }
 
       // Track redirect for observability
       trackRedirect(user.id, safeRedirect)
-
-      // TODO: Role-based routing (when roles are implemented)
-      // const { data: profile } = await supabase
-      //   .from('user_profiles')
-      //   .select('role')
-      //   .eq('id', user.id)
-      //   .single()
-      // 
-      // if (profile?.role === 'owner') redirect('/owner/dashboard')
-      // if (profile?.role === 'admin') redirect('/admin/dashboard')
 
       redirect(safeRedirect)
     }

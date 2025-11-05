@@ -247,22 +247,35 @@ export async function securityMiddleware(req: NextRequest): Promise<NextResponse
 
   // CSRF protection for state-changing requests
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    const csrfToken = req.headers.get('x-csrf-token') || req.nextUrl.searchParams.get('csrfToken');
+    // Exempt certain endpoints from CSRF validation
+    const csrfExemptPaths = [
+      '/api/webhooks/', // All webhook endpoints
+      '/api/payments/stripe/connect', // Stripe Connect redirect
+      '/api/payments/stripe/webhook', // Stripe webhook
+      '/api/auth/callback', // OAuth callbacks
+      '/auth/callback', // Supabase auth callback
+    ];
 
-    if (!csrfToken || !(await validateAndConsumeCSRFToken(csrfToken))) {
-      logCSRFViolation(req);
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Invalid CSRF token',
-          message: 'Security validation failed.',
-        }),
-        {
-          status: 403,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    const isExempt = csrfExemptPaths.some(path => pathname.startsWith(path));
+
+    if (!isExempt) {
+      const csrfToken = req.headers.get('x-csrf-token') || req.nextUrl.searchParams.get('csrfToken');
+
+      if (!csrfToken || !(await validateAndConsumeCSRFToken(csrfToken))) {
+        logCSRFViolation(req);
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Invalid CSRF token',
+            message: 'Security validation failed. Please refresh the page and try again.',
+          }),
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
     }
   }
 

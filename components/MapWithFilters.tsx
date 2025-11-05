@@ -6,6 +6,9 @@ import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import Image from 'next/image';
 import { supabase } from '@/utils/supabaseClient';
 
+import { getMapsConfig } from '@/lib/maps/config';
+import { MapsApiKeyNotice } from '@/components/maps/MapsApiKeyNotice';
+
 const containerStyle = {
   width: '100%',
   height: '400px',
@@ -17,8 +20,14 @@ const center = {
 };
 
 export default function MapWithFilters() {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_MAPS_API_KEY || '',
+  const mapsConfig = useMemo(() => getMapsConfig({ requireApiKey: false, silent: true }), []);
+  const shouldShowFallback = !mapsConfig.apiKey;
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: mapsConfig.apiKey,
+    libraries: mapsConfig.libraries,
+    mapIds: mapsConfig.mapId ? [mapsConfig.mapId] : undefined,
   });
   const [apartments, setApartments] = useState<any[]>([]);
   const [minPrice, setMinPrice] = useState<number>(120000);
@@ -49,6 +58,10 @@ export default function MapWithFilters() {
       );
     });
   }, [apartments, minPrice, maxPrice, bedrooms, bathrooms, balconies, nearbyFilters]);
+
+  if (shouldShowFallback || loadError) {
+    return <MapsApiKeyNotice message={mapsConfig.fallbackMessage} />;
+  }
 
   if (!isLoaded) return <div>Loading Map...</div>;
 
@@ -120,7 +133,14 @@ export default function MapWithFilters() {
       </div>
 
       {/* Google Map */}
-      <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={13}>
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={center}
+        zoom={13}
+        options={{
+          mapId: mapsConfig.mapId,
+        }}
+      >
         {filtered.map((apt) => (
           <Marker key={apt.id} position={{ lat: apt.latitude ?? apt.lat, lng: apt.longitude ?? apt.lng }} />
         ))}

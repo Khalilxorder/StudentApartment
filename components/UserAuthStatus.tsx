@@ -184,28 +184,79 @@ export default function UserAuthStatus() {
 
 async function loadProfile(user: User): Promise<UserProfileSummary | null> {
   try {
-    const { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .select('role, email')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userRecord) {
-      console.warn('Unable to load user record for profile summary', userError);
-      return null;
-    }
-
-    const role = (userRecord.role as UserRole) ?? 'student';
+    // Get metadata from auth
     const metadata = user.user_metadata ?? {};
     const fallbackAvatar = (metadata.avatar_url ?? metadata.picture) as string | undefined;
     const fallbackName = (metadata.full_name ?? metadata.name) as string | undefined;
+    const email = user.email ?? '';
+
+    // Try to get user record from public.users
+    let { data: userRecord, error: userError } = await supabase
+      .from('users')
+      .select('role, email')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    // If user record doesn't exist, create it
+    if (!userRecord && !userError) {
+      console.log('Creating new user record for', user.id);
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: email,
+          role: 'student', // Default role
+          email_verified: !!user.email_confirmed_at,
+        })
+        .select('role, email')
+        .single();
+
+      if (insertError) {
+        console.error('Failed to create user record', insertError);
+        // Return basic profile from auth metadata
+        return {
+          id: user.id,
+          role: 'student',
+          fullName: fallbackName ?? undefined,
+          avatarUrl: fallbackAvatar,
+        };
+      }
+      userRecord = newUser;
+    }
+
+    if (userError) {
+      console.warn('Error loading user record', userError);
+      // Return basic profile from auth metadata
+      return {
+        id: user.id,
+        role: 'student',
+        fullName: fallbackName ?? undefined,
+        avatarUrl: fallbackAvatar,
+      };
+    }
+
+    const role = (userRecord?.role as UserRole) ?? 'student';
 
     if (role === 'owner') {
-      const { data: ownerProfile } = await supabase
+      let { data: ownerProfile } = await supabase
         .from('profiles_owner')
         .select('full_name')
         .eq('id', user.id)
         .maybeSingle();
+
+      // Auto-create owner profile if missing
+      if (!ownerProfile) {
+        const { data: newProfile } = await supabase
+          .from('profiles_owner')
+          .insert({
+            id: user.id,
+            user_id: user.id,
+            full_name: fallbackName ?? '',
+          })
+          .select('full_name')
+          .single();
+        ownerProfile = newProfile;
+      }
 
       return {
         id: user.id,
@@ -216,11 +267,25 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
     }
 
     if (role === 'student') {
-      const { data: studentProfile } = await supabase
+      let { data: studentProfile } = await supabase
         .from('profiles_student')
         .select('full_name, university')
         .eq('id', user.id)
         .maybeSingle();
+
+      // Auto-create student profile if missing
+      if (!studentProfile) {
+        const { data: newProfile } = await supabase
+          .from('profiles_student')
+          .insert({
+            id: user.id,
+            user_id: user.id,
+            full_name: fallbackName ?? '',
+          })
+          .select('full_name, university')
+          .single();
+        studentProfile = newProfile;
+      }
 
       return {
         id: user.id,
@@ -239,6 +304,13 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
     };
   } catch (error) {
     console.error('Failed to load user profile summary', error);
-    return null;
+    // Return basic profile even on error
+    const metadata = user.user_metadata ?? {};
+    return {
+      id: user.id,
+      role: 'student',
+      fullName: (metadata.full_name ?? metadata.name) as string | undefined,
+      avatarUrl: (metadata.avatar_url ?? metadata.picture) as string | undefined,
+    };
   }
 }

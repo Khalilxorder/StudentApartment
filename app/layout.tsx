@@ -81,11 +81,11 @@ export default function RootLayout({
         <meta name="theme-color" content="#f97316" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className={`${inter.className} flex flex-col h-screen overflow-hidden`}>
+      <body className={`${inter.className} flex flex-col min-h-screen`}>
         <OrganizationStructuredData />
         <Providers>
           <UserAuthStatus />
-          <div id="main-content" className="flex-1 overflow-hidden">
+          <div id="main-content" className="flex-1 overflow-y-auto">
             {children}
           </div>
           <CookieConsent />

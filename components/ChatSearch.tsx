@@ -346,22 +346,33 @@ export default function ChatSearch() {
         title,
         address,
         description,
-        price_huf,
+        monthly_rent_huf,
         bedrooms,
         bathrooms,
         district,
-        image_urls,
-        amenities,
-        pet_friendly,
-        parking_available,
-        internet_included,
-        laundry_in_unit,
-        elevator,
+        latitude,
+        longitude,
+        furnished,
+        has_elevator,
+        size_sqm,
+        floor,
+        total_floors,
+        lease_min_months,
+        deposit_months,
+        utilities_included,
+        pets_allowed,
+        owner_verified,
         distance_to_metro_m,
         distance_to_university_m,
-        owner_verified,
-        lease_min_months,
-        created_at
+        image_urls,
+        created_at,
+        apartment_amenities(
+          amenity_code,
+          amenities(
+            code,
+            label
+          )
+        )
       `)
       .eq('is_available', true)
       .order('created_at', { ascending: false })
@@ -373,11 +384,11 @@ export default function ChatSearch() {
     }
     if (filters.minPrice) {
       console.log('? Filtering minPrice >=', filters.minPrice);
-      query = query.gte('price_huf', filters.minPrice);
+      query = query.gte('monthly_rent_huf', filters.minPrice);
     }
     if (filters.maxPrice) {
       console.log('? Filtering maxPrice <=', filters.maxPrice);
-      query = query.lte('price_huf', filters.maxPrice);
+      query = query.lte('monthly_rent_huf', filters.maxPrice);
     }
     if (filters.district) {
       console.log('? Filtering district =', filters.district);
@@ -395,8 +406,25 @@ export default function ChatSearch() {
 
     const { data, error } = await query;
     if (error) throw error;
-    console.log(`?? Found ${data?.length || 0} apartments from database`);
-    return data || [];
+    const normalized = (data ?? []).map((apt: any) => {
+      const amenities = Array.isArray(apt.apartment_amenities)
+        ? apt.apartment_amenities
+            .map((entry: any) =>
+              entry?.amenity?.label ?? entry?.amenity?.code ?? entry?.amenity_code ?? null,
+            )
+            .filter((value: string | null): value is string => Boolean(value))
+        : [];
+
+      const { apartment_amenities, monthly_rent_huf, ...rest } = apt;
+      return { 
+        ...rest, 
+        price_huf: monthly_rent_huf, // Normalize for UI compatibility
+        amenities 
+      };
+    });
+
+    console.log(`?? Found ${normalized.length} apartments from database`);
+    return normalized;
   };  const runSearchFlow = async (story: string) => {
     setLoading(true);
     const sanitizedStory = sanitizeUserInput(story);

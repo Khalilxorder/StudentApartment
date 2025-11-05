@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
-    const otherUserId = searchParams.get('otherUserId');
 
     if (conversationId) {
       // Get messages for a specific conversation
@@ -26,169 +25,112 @@ export async function GET(request: NextRequest) {
           id,
           content,
           created_at,
-          read,
+          read_at,
           sender_id,
-          receiver_id,
-          sender:user_profiles!messages_sender_id_fkey(
-            first_name,
-            last_name,
-            avatar_url,
-            user_type
-          ),
-          receiver:user_profiles!messages_receiver_id_fkey(
-            first_name,
-            last_name,
-            avatar_url,
-            user_type
-          )
+          message_type,
+          metadata
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (error) {
         console.error('Messages fetch error:', error);
-        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+        return NextResponse.json(
+          { error: 'Failed to fetch messages', details: error.message },
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
       }
 
-      // Mark messages as read
+      // Mark unread messages as read
+      const now = new Date().toISOString();
       await supabase
         .from('messages')
-        .update({ read: true })
+        .update({ read_at: now })
         .eq('conversation_id', conversationId)
-        .eq('receiver_id', user.id)
-        .eq('read', false);
+        .neq('sender_id', user.id) // Don't mark own messages as read
+        .is('read_at', null);
 
-      return NextResponse.json({ messages: messages || [] });
-    } else if (otherUserId) {
-      // Get or create conversation between users
-      const conversationId = [user.id, otherUserId].sort().join('_');
-
-      // Check if conversation exists
-      const { data: existingMessages } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('conversation_id', conversationId)
-        .limit(1);
-
-      if (!existingMessages || existingMessages.length === 0) {
-        // Create conversation record if it doesn't exist
-        await supabase
-          .from('conversations')
-          .upsert({
-            id: conversationId,
-            participant1_id: user.id,
-            participant2_id: otherUserId,
-            last_message_at: new Date().toISOString(),
-          });
-      }
-
-      // Get conversation messages
-      const { data: messages, error } = await supabase
-        .from('messages')
+      return NextResponse.json(
+        { messages: messages || [] },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Get all conversations for the user
+      const { data: conversations, error } = await supabase
+        .from('conversations')
         .select(`
           id,
-          content,
+          apartment_id,
+          student_id,
+          owner_id,
+          status,
+          last_message_at,
+          last_message_preview,
+          unread_count_student,
+          unread_count_owner,
           created_at,
-          read,
-          sender_id,
-          receiver_id,
-          sender:user_profiles!messages_sender_id_fkey(
-            first_name,
-            last_name,
-            avatar_url,
-            user_type
-          ),
-          receiver:user_profiles!messages_receiver_id_fkey(
-            first_name,
-            last_name,
-            avatar_url,
-            user_type
+          apartment:apartments(
+            id,
+            title,
+            address,
+            monthly_rent_huf
           )
         `)
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+        .or(`student_id.eq.${user.id},owner_id.eq.${user.id}`)
+        .eq('status', 'active')
+        .order('last_message_at', { ascending: false });
 
       if (error) {
-        console.error('Messages fetch error:', error);
-        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+        console.error('Conversations fetch error:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch conversations', details: error.message },
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
       }
 
-      return NextResponse.json({
-        conversationId,
-        messages: messages || []
-      });
-    } else {
-      // Get all conversations for the user (with caching)
-      const cacheKey = `conversations:user:${user.id}`;
-      
-      const transformedConversations = await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const { data: conversations, error } = await supabase
-            .from('conversations')
-            .select(`
-              id,
-              last_message_at,
-              participant1_id,
-              participant2_id,
-              last_message:messages(
-                content,
-                created_at,
-                sender_id
-              ),
-              participant1:user_profiles!conversations_participant1_id_fkey(
-                first_name,
-                last_name,
-                avatar_url,
-                user_type
-              ),
-              participant2:user_profiles!conversations_participant2_id_fkey(
-                first_name,
-                last_name,
-                avatar_url,
-                user_type
-              )
-            `)
-            .or(`participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
-            .order('last_message_at', { ascending: false });
+      // Get other participant info for each conversation
+      const conversationsWithParticipants = await Promise.all(
+        (conversations || []).map(async (conv: any) => {
+          const isStudent = conv.student_id === user.id;
+          const otherUserId = isStudent ? conv.owner_id : conv.student_id;
+          const otherUserRole = isStudent ? 'owner' : 'student';
 
-          if (error) {
-            throw new Error('Failed to fetch conversations');
-          }
+          // Get other user's profile
+          const tableName = otherUserRole === 'owner' ? 'profiles_owner' : 'profiles_student';
+          const { data: profile } = await supabase
+            .from(tableName)
+            .select('full_name')
+            .eq('id', otherUserId)
+            .maybeSingle();
 
-          // Transform data to include other participant info
-          return conversations?.map((conv: any) => {
-            const isParticipant1 = conv.participant1_id === user.id;
-            const otherParticipant = isParticipant1 ? conv.participant2 : conv.participant1;
-            const otherUserId = isParticipant1 ? conv.participant2_id : conv.participant1_id;
-            const lastMessage = conv.last_message?.[0];
-
-            return {
-              id: conv.id,
-              otherUser: otherParticipant,
-              otherUserId: otherUserId,
-              lastMessage: lastMessage ? {
-                content: lastMessage.content,
-                created_at: lastMessage.created_at,
-                sender_id: lastMessage.sender_id,
-              } : null,
-              lastMessageAt: conv.last_message_at,
-              unreadCount: 0, // Will be calculated separately if needed
-            };
-          }) || [];
-        },
-        {
-          ttl: 60, // Cache for 1 minute (messages change frequently)
-          tags: [`user:${user.id}`, 'conversations'],
-        }
+          return {
+            id: conv.id,
+            apartmentId: conv.apartment_id,
+            apartment: conv.apartment,
+            otherUserId,
+            otherUserRole,
+            otherUserName: profile?.full_name || 'Unknown User',
+            lastMessage: conv.last_message_preview,
+            lastMessageAt: conv.last_message_at,
+            unreadCount: isStudent ? conv.unread_count_student : conv.unread_count_owner,
+            status: conv.status,
+            createdAt: conv.created_at,
+          };
+        })
       );
 
-      return NextResponse.json({ conversations: transformedConversations });
+      return NextResponse.json(
+        { conversations: conversationsWithParticipants },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
   } catch (error) {
     console.error('Messages API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
 

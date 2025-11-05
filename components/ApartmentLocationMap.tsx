@@ -3,6 +3,9 @@
 import React from 'react';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 
+import { getMapsConfig } from '@/lib/maps/config';
+import { MapsApiKeyNotice } from '@/components/maps/MapsApiKeyNotice';
+
 interface ApartmentLocationMapProps {
   latitude: number;
   longitude: number;
@@ -22,9 +25,20 @@ export default function ApartmentLocationMap({
   address,
   title
 }: ApartmentLocationMapProps) {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_Maps_API_KEY || '',
+  const mapsConfig = React.useMemo(() => getMapsConfig({ requireApiKey: false, silent: true }), []);
+
+  const shouldShowFallback = !mapsConfig.apiKey;
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: mapsConfig.apiKey,
+    libraries: mapsConfig.libraries,
+    mapIds: mapsConfig.mapId ? [mapsConfig.mapId] : undefined,
   });
+
+  if (shouldShowFallback || loadError) {
+    return <MapsApiKeyNotice message={mapsConfig.fallbackMessage} />;
+  }
 
   if (!isLoaded) {
     return (
@@ -62,6 +76,7 @@ export default function ApartmentLocationMap({
             streetViewControl: false,
             mapTypeControl: false,
             fullscreenControl: false,
+            mapId: mapsConfig.mapId,
           }}
         >
           <Marker
