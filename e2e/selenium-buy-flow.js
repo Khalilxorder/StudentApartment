@@ -63,7 +63,7 @@ function log(type, msg) {
     // ============================================
     log('section', 'TEST 1: Navigate to Home Page');
     try {
-      await driver.get('http://localhost:3000/');
+      await driver.get('http://localhost:3002/');
       await driver.wait(until.elementLocated(By.css('body')), 10000);
       log('success', 'Home page loaded');
       testResults.push({ test: 'Home Page Load', status: 'PASS' });
