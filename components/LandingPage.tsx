@@ -9,6 +9,65 @@ export default function LandingPage() {
         <ChatSearch />
       </section>
 
+      {/* Role Selection Section */}
+      <section className="py-12 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* For Students */}
+            <Link href="/search" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 p-8 transition-all hover:shadow-lg hover:scale-[1.01] border border-orange-100">
+              <div className="relative z-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-orange-500 text-white mb-6 shadow-md group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Rent an Apartment</h3>
+                <p className="text-gray-600 mb-6">
+                  Find your perfect student home with our AI-powered search. Browse verified listings near your university.
+                </p>
+                <span className="inline-flex items-center font-semibold text-orange-600 group-hover:text-orange-700">
+                  Start Searching
+                  <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </span>
+              </div>
+              <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4">
+                <svg className="w-64 h-64" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z" />
+                </svg>
+              </div>
+            </Link>
+
+            {/* For Owners */}
+            <Link href="/owner/listings/create" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 p-8 transition-all hover:shadow-lg hover:scale-[1.01] border border-blue-100">
+              <div className="relative z-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white mb-6 shadow-md group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2" suppressHydrationWarning>Upload Listing</h3>
+                <p className="text-gray-600 mb-6">
+                  Connect with thousands of verified students. Manage listings, viewings, and payments in one place.
+                </p>
+                <span className="inline-flex items-center font-semibold text-blue-600 group-hover:text-blue-700" suppressHydrationWarning>
+                  Upload Listing
+                  <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </span>
+              </div>
+              <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4">
+                <svg className="w-64 h-64" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="bg-gray-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -240,7 +299,7 @@ export default function LandingPage() {
               Get Started Free
             </Link>
             <Link
-              href="/(app)/search"
+              href="/search"
               className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-md text-white hover:bg-white hover:text-orange-600 md:text-lg transition"
             >
               Browse Apartments

@@ -313,17 +313,17 @@ export default function SavedSearchCreation({
               <div className="space-y-2">
                 <Label htmlFor="bedrooms">Bedrooms</Label>
                 <Select
-                  value={searchData.bedrooms?.toString() || ''}
+                  value={searchData.bedrooms !== undefined ? searchData.bedrooms.toString() : 'any'}
                   onValueChange={(value: string) => setSearchData(prev => ({
                     ...prev,
-                    bedrooms: value ? parseInt(value) : undefined
+                    bedrooms: value === 'any' ? undefined : parseInt(value)
                   }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any</SelectItem>
+                    <SelectItem value="any">Any</SelectItem>
                     <SelectItem value="0">Studio</SelectItem>
                     <SelectItem value="1">1 BR</SelectItem>
                     <SelectItem value="2">2 BR</SelectItem>
@@ -335,17 +335,17 @@ export default function SavedSearchCreation({
               <div className="space-y-2">
                 <Label htmlFor="bathrooms">Bathrooms</Label>
                 <Select
-                  value={searchData.bathrooms?.toString() || ''}
+                  value={searchData.bathrooms !== undefined ? searchData.bathrooms.toString() : 'any'}
                   onValueChange={(value: string) => setSearchData(prev => ({
                     ...prev,
-                    bathrooms: value ? parseFloat(value) : undefined
+                    bathrooms: value === 'any' ? undefined : parseFloat(value)
                   }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any</SelectItem>
+                    <SelectItem value="any">Any</SelectItem>
                     <SelectItem value="1">1+</SelectItem>
                     <SelectItem value="1.5">1.5+</SelectItem>
                     <SelectItem value="2">2+</SelectItem>

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { OwnerProfileFormData } from '@/types/owner-profile';
 import { calculateProfileCompletenessScore, getCompletenessLevel, getCompletenessPercentage } from '@/types/owner-profile';
+import StripePayoutCard from '@/components/StripePayoutCard';
 
 export default function OwnerProfilePage() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function OwnerProfilePage() {
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [completenessScore, setCompletenessScore] = useState(0);
+  const [stripeAccountId, setStripeAccountId] = useState<string | undefined>(undefined);
+  const [stripeConnectStatus, setStripeConnectStatus] = useState<string>('not_started');
   const [profile, setProfile] = useState<OwnerProfileFormData>({
     full_name: null,
     phone: null,
@@ -77,6 +80,14 @@ export default function OwnerProfilePage() {
         };
         setProfile(loaded);
         setCompletenessScore(profileData.profile_completeness_score || 0);
+
+        // Load Stripe data
+        if (profileData.stripe_account_id) {
+          setStripeAccountId(profileData.stripe_account_id);
+        }
+        if (profileData.stripe_connect_status) {
+          setStripeConnectStatus(profileData.stripe_connect_status);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -154,9 +165,6 @@ export default function OwnerProfilePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link href="/owner" className="text-blue-600 hover:text-blue-700">
-              ← Back to Dashboard
-            </Link>
             <h1 className="text-3xl font-bold text-gray-900">Owner Profile</h1>
           </div>
         </div>
@@ -205,12 +213,11 @@ export default function OwnerProfilePage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
-                      className={`h-3 rounded-full transition-all ${
-                        completenessScore < 25 ? 'bg-red-500' :
-                        completenessScore < 50 ? 'bg-yellow-500' :
-                        completenessScore < 75 ? 'bg-blue-500' :
-                        'bg-green-500'
-                      }`}
+                      className={`h-3 rounded-full transition-all ${completenessScore < 25 ? 'bg-red-500' :
+                          completenessScore < 50 ? 'bg-yellow-500' :
+                            completenessScore < 75 ? 'bg-blue-500' :
+                              'bg-green-500'
+                        }`}
                       style={{ width: `${completenessScore}%` }}
                     />
                   </div>
@@ -222,6 +229,13 @@ export default function OwnerProfilePage() {
                   {getCompletenessLevel(completenessScore) === 'excellent' && '⭐ Excellent! Your profile is complete and compelling.'}
                 </p>
               </div>
+
+              {/* Stripe Payouts Card */}
+              <StripePayoutCard
+                stripeAccountId={stripeAccountId}
+                stripeConnectStatus={stripeConnectStatus}
+                email={user?.email}
+              />
 
               {/* Basic Information */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

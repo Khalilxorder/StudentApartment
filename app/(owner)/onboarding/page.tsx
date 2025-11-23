@@ -48,11 +48,40 @@ export default function OwnerOnboardingPage() {
     setError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('User not authenticated');
+        return;
+      }
+
+      // Load user profile for email & company info
+      const { data: profile } = await supabase
+        .from('profiles_owner')
+        .select('company_name')
+        .eq('id', user.id)
+        .single();
+
+      // Fetch CSRF token
+      const csrfResponse = await fetch('/api/csrf');
+      const { csrfToken } = await csrfResponse.json();
+
+      if (!csrfToken) {
+        throw new Error('Failed to get CSRF token');
+      }
+
+      // Call the real Stripe Connect endpoint
       const response = await fetch('/api/payments/stripe/connect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
         },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email || '',
+          country: 'HU',  // Could be parameterized from user preferences
+          businessName: profile?.company_name || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -61,9 +90,9 @@ export default function OwnerOnboardingPage() {
         throw new Error(data.error || 'Failed to start onboarding');
       }
 
-      if (data.url) {
-        // Redirect to Stripe onboarding
-        window.location.href = data.url;
+      if (data.onboarding_url) {
+        // Redirect to Stripe Connect onboarding
+        window.location.href = data.onboarding_url;
       } else {
         throw new Error('No onboarding URL received');
       }
@@ -149,11 +178,23 @@ export default function OwnerOnboardingPage() {
                 <Button
                   onClick={startStripeOnboarding}
                   disabled={loading}
-                  className="w-full"
+                  className="w-full mb-3"
                   size="lg"
                 >
                   {loading ? 'Starting Setup...' : 'Start Stripe Onboarding'}
                 </Button>
+                
+                <Button
+                  onClick={() => router.push('/owner/overview')}
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                >
+                  Skip for Now
+                </Button>
+                <p className="text-sm text-gray-500 text-center mt-2">
+                  You can set this up later from Profile & Payouts
+                </p>
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabaseClient';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import UserAuthStatus from '@/components/UserAuthStatus';
@@ -33,9 +33,9 @@ export default async function OwnerDashboard() {
   const { data: unreadMessages } = await supabase
     .from('messages')
     .select('id, apartment_id')
-    .in('apartment_id', (apartments || []).map((a: any) => a.id))
+    .in('apartment_id', (apartments || []).map(a => a.id))
     .eq('read', false)
-    .neq('sender_id', user.id);
+    .neq('sender_email', user.email);
 
   // Calculate total revenue this month
   const startOfMonth = new Date();
@@ -44,12 +44,12 @@ export default async function OwnerDashboard() {
 
   const { data: monthlyPayments } = await supabase
     .from('payment_transactions')
-    .select('amount_huf, bookings!inner(owner_id)')
+    .select('amount, bookings!inner(owner_id)')
     .eq('bookings.owner_id', user.id)
     .eq('status', 'succeeded')
     .gte('created_at', startOfMonth.toISOString());
 
-  const monthlyRevenue = (monthlyPayments || []).reduce((sum: number, p: any) => sum + (p.amount_huf || 0), 0);
+  const monthlyRevenue = (monthlyPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
 
   // Get recent bookings
   const { data: recentBookings } = await supabase
@@ -195,18 +195,17 @@ export default async function OwnerDashboard() {
                         {booking.apartments?.title || 'Unknown Apartment'}
                       </h3>
                       <p className="text-sm text-gray-500 mt-1">
-                        Tenant: {booking.user_profiles?.full_name || 'Unknown'} • 
-                        Move-in: {new Date(booking.move_in_date).toLocaleDateString()} • 
+                        Tenant: {booking.user_profiles?.full_name || 'Unknown'} •
+                        Move-in: {new Date(booking.move_in_date).toLocaleDateString()} •
                         {booking.lease_months} months
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                        booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        booking.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          booking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                        }`}>
                         {booking.status}
                       </span>
                       <span className="text-sm font-medium text-gray-900">

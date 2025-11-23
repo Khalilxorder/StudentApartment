@@ -144,9 +144,21 @@ export default function PaymentModal({ apartment, onClose, userEmail }: PaymentM
 
     const createPaymentIntent = async () => {
       try {
+        // Fetch CSRF token first
+        const csrfResponse = await fetch('/api/csrf', { cache: 'no-store' });
+        const csrfData = await csrfResponse.json();
+        const csrfToken = csrfData?.csrfToken;
+
+        if (!csrfToken) {
+          throw new Error('Failed to obtain CSRF token');
+        }
+
         const response = await fetch('/api/payments/create-intent', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
           body: JSON.stringify({
             apartmentId: apartment.id,
             userId: userEmail,
@@ -163,7 +175,7 @@ export default function PaymentModal({ apartment, onClose, userEmail }: PaymentM
         const data = await response.json();
         setClientSecret(data.clientSecret);
         setBookingId(data.bookingId);
-        
+
         // Track booking creation
         trackEvent('booking_created', {
           apartment_id: apartment.id,

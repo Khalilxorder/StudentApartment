@@ -108,11 +108,8 @@ export default function UserAuthStatus() {
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Clear chat cache and redirect to home
-    localStorage.removeItem('chatSearch_results');
-    localStorage.removeItem('chatSearch_messages');
-    localStorage.removeItem('chatSearch_features');
-    window.location.href = '/?clear=true';
+    // Navigate to home page
+    window.location.href = '/';
   };
 
   if (loading) {
@@ -131,12 +128,14 @@ export default function UserAuthStatus() {
 
   return (
     <>
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
+      <div suppressHydrationWarning className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
           <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
             <Logo className="h-10 w-auto" />
             <h1 className="text-gray-900 font-bold text-lg">Student Apartments</h1>
           </a>
+
+
 
           {user ? (
             // User is signed in
@@ -197,17 +196,17 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
       .eq('id', user.id)
       .maybeSingle();
 
-    // If user record doesn't exist, create it
+    // If user record doesn't exist, create it (use upsert to handle existing records)
     if (!userRecord && !userError) {
-      console.log('Creating new user record for', user.id);
+      console.log('Creating/updating user record for', user.id);
       const { data: newUser, error: insertError } = await supabase
         .from('users')
-        .insert({
+        .upsert({
           id: user.id,
           email: email,
           role: 'student', // Default role
           email_verified: !!user.email_confirmed_at,
-        })
+        }, { onConflict: 'id' })
         .select('role, email')
         .single();
 
@@ -244,15 +243,15 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
         .eq('id', user.id)
         .maybeSingle();
 
-      // Auto-create owner profile if missing
+      // Auto-create owner profile if missing (use upsert)
       if (!ownerProfile) {
         const { data: newProfile } = await supabase
           .from('profiles_owner')
-          .insert({
+          .upsert({
             id: user.id,
             user_id: user.id,
             full_name: fallbackName ?? '',
-          })
+          }, { onConflict: 'id' })
           .select('full_name')
           .single();
         ownerProfile = newProfile;
@@ -273,15 +272,15 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
         .eq('id', user.id)
         .maybeSingle();
 
-      // Auto-create student profile if missing
+      // Auto-create student profile if missing (use upsert)
       if (!studentProfile) {
         const { data: newProfile } = await supabase
           .from('profiles_student')
-          .insert({
+          .upsert({
             id: user.id,
             user_id: user.id,
             full_name: fallbackName ?? '',
-          })
+          }, { onConflict: 'id' })
           .select('full_name, university')
           .single();
         studentProfile = newProfile;

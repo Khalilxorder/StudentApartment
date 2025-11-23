@@ -1,48 +1,30 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, FormEvent, MouseEvent } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-
-import { sanitizeUserInput } from '@/lib/sanitize';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabaseClient';
+import { sanitizeUserInput } from '@/lib/sanitize';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-interface ConversationSummary {
-  conversationId: string;
-  apartmentId: string;
-  apartmentTitle: string;
-  apartmentImage: string;
-  tenantId: string;
-  tenantName: string;
-  tenantEmail?: string;
-  tenantAvatar?: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
+interface Conversation {
+  conversation_key: string;
+  apartment_id: string;
+  apartment_title: string;
+  apartment_image: string;
+  tenant_email: string;
+  tenant_name: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
 }
 
-interface MessageItem {
+interface Message {
   id: string;
-  conversationId: string;
   content: string;
-  senderId: string;
-  createdAt: string;
+  sender_email: string;
+  created_at: string;
   read: boolean;
 }
-
-const buildConversationKey = (apartmentId: string, userA: string, userB: string) => {
-  const sorted = [userA, userB].sort();
-  return [apartmentId, ...sorted].join('::');
-};
-
-const mapRowToMessage = (row: any): MessageItem => ({
-  id: row.id,
-  conversationId: row.conversation_id,
-  content: row.content,
-  senderId: row.sender_id,
-  createdAt: row.created_at,
-  read: row.read,
-});
 
 export default function OwnerMessagesPage() {
   const router = useRouter();
@@ -51,513 +33,387 @@ export default function OwnerMessagesPage() {
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(() => {
+    loadUserAndConversations();
   }, []);
 
-  const markConversationAsRead = useCallback(
-    async (conversationId: string, userId: string) => {
-      if (!conversationId || !userId) return;
+  useEffect(() => {
+    if (selectedConversation) {
+      const [apartmentId, tenantEmail] = selectedConversation.split('::');
+      loadMessages(apartmentId, tenantEmail);
+      markConversationAsRead(apartmentId, tenantEmail);
 
-      const { error } = await supabase
-        .from('messages')
-        .update({
-          read: true,
-          read_at: new Date().toISOString(),
-        })
-        .eq('conversation_id', conversationId)
-        .eq('receiver_id', userId)
-        .eq('read', false);
+      // Subscribe to new messages
+      const channel = supabase
+        .channel(`owner-messages:${apartmentId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `apartment_id=eq.${apartmentId}`,
+          },
+          (payload) => {
+            const newMsg = payload.new as Message;
+            if (newMsg.sender_email === tenantEmail || newMsg.sender_email === user?.email) {
+              setMessages((prev) => [...prev, newMsg]);
+              scrollToBottom();
+            }
+          }
+        )
+        .subscribe();
 
-      if (error) {
-        console.error('Failed to mark conversation as read:', error);
-      }
-    },
-    [supabase]
-  );
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [selectedConversation, user]);
 
-  const loadUserAndConversations = useCallback(async () => {
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const loadUserAndConversations = async () => {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData?.user;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
         router.push('/login');
         return;
       }
+
       setUser(authUser);
 
-      const { data: apartments, error: apartmentsError } = await supabase
+      // Get user's apartments
+      const { data: apartments } = await supabase
         .from('apartments')
         .select('id')
         .eq('owner_id', authUser.id);
 
-      if (apartmentsError) {
-        console.error('Failed to load apartments:', apartmentsError);
+      if (!apartments || apartments.length === 0) {
+        setLoading(false);
         return;
       }
 
-      const apartmentIds = apartments?.map((apartment: any) => apartment.id) ?? [];
-      if (apartmentIds.length === 0) {
-        setConversations([]);
-        setMessages([]);
-        setSelectedConversationId(null);
-        return;
-      }
+      const apartmentIds = apartments.map((apt) => apt.id);
 
-      const { data: messageData, error: messageError } = await supabase
+      // Get all messages for owner's apartments
+      const { data: messageData } = await supabase
         .from('messages')
-        .select(`
-          conversation_id,
-          conversation_key,
-          apartment_id,
-          sender_id,
-          receiver_id,
-          content,
-          read,
-          created_at,
-          apartments(title, image_urls)
-        `)
+        .select('*, apartments(title, image_urls)')
         .in('apartment_id', apartmentIds)
         .order('created_at', { ascending: false });
 
-      if (messageError) {
-        console.error('Failed to load messages:', messageError);
-        return;
+      if (messageData) {
+        // Group messages by apartment_id + tenant_email
+        const groupedConversations: { [key: string]: any } = {};
+
+        messageData.forEach((msg: any) => {
+          const tenantEmail = msg.sender_email === authUser.email ? msg.owner_email : msg.sender_email;
+          const conversationKey = `${msg.apartment_id}::${tenantEmail}`;
+
+          if (!groupedConversations[conversationKey]) {
+            const unreadCount = messageData.filter(
+              (m: any) =>
+                m.apartment_id === msg.apartment_id &&
+                (m.sender_email === tenantEmail) &&
+                !m.read &&
+                m.sender_email !== authUser.email
+            ).length;
+
+            groupedConversations[conversationKey] = {
+              conversation_key: conversationKey,
+              apartment_id: msg.apartment_id,
+              apartment_title: msg.apartments?.title || 'Untitled',
+              apartment_image: msg.apartments?.image_urls?.[0] || '',
+              tenant_email: tenantEmail,
+              tenant_name: tenantEmail.split('@')[0], // Simple name extraction
+              last_message: msg.content,
+              last_message_time: msg.created_at,
+              unread_count: unreadCount,
+            };
+          }
+        });
+
+        setConversations(Object.values(groupedConversations));
       }
-
-      if (!messageData || messageData.length === 0) {
-        setConversations([]);
-        setMessages([]);
-        setSelectedConversationId(null);
-        return;
-      }
-
-      const grouped = new Map<string, any[]>();
-      const profileIds = new Set<string>();
-
-      messageData.forEach((row: any) => {
-        const conversationId = row.conversation_id || row.conversation_key;
-        if (!conversationId) {
-          return;
-        }
-        if (!grouped.has(conversationId)) {
-          grouped.set(conversationId, []);
-        }
-        grouped.get(conversationId)!.push(row);
-
-        const tenantId = row.sender_id === authUser.id ? row.receiver_id : row.sender_id;
-        if (tenantId) {
-          profileIds.add(tenantId);
-        }
-      });
-
-      let profileMap = new Map<string, any>();
-      if (profileIds.size > 0) {
-        const { data: profiles, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id, email, full_name, avatar_url')
-          .in('id', Array.from(profileIds));
-
-        if (profileError) {
-          console.error('Failed to load tenant profiles:', profileError);
-        } else if (profiles) {
-          profileMap = new Map(profiles.map((profile: any) => [profile.id, profile]));
-        }
-      }
-
-      const conversationList: ConversationSummary[] = Array.from(grouped.entries()).map(
-        ([conversationId, rows]) => {
-          const sortedRows = rows
-            .slice()
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          const latest = sortedRows[0];
-          const tenantId = latest.sender_id === authUser.id ? latest.receiver_id : latest.sender_id;
-          const tenantProfile = tenantId ? profileMap.get(tenantId) : undefined;
-          const unreadCount = rows.filter(
-            message => !message.read && message.receiver_id === authUser.id
-          ).length;
-
-          return {
-            conversationId,
-            apartmentId: latest.apartment_id,
-            apartmentTitle: latest.apartments?.title || 'Untitled apartment',
-            apartmentImage: latest.apartments?.image_urls?.[0] || '',
-            tenantId,
-            tenantName:
-              tenantProfile?.full_name ||
-              tenantProfile?.email ||
-              (tenantId ? `Tenant ${tenantId.slice(0, 8)}` : 'Tenant'),
-            tenantEmail: tenantProfile?.email,
-            tenantAvatar: tenantProfile?.avatar_url || undefined,
-            lastMessage: latest.content,
-            lastMessageTime: latest.created_at,
-            unreadCount,
-          };
-        }
-      );
-
-      conversationList.sort(
-        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-      );
-
-      setConversations(conversationList);
-      setSelectedConversationId(prev =>
-        prev ?? (conversationList.length > 0 ? conversationList[0].conversationId : null)
-      );
     } catch (error) {
-      console.error('Error loading owner conversations:', error);
+      console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
-  }, [router, supabase]);
+  };
 
-  const loadMessages = useCallback(
-    async (conversationId: string) => {
-      if (!conversationId || !user?.id) {
-        return;
-      }
-
-      const { data, error } = await supabase
+  const loadMessages = async (apartmentId: string, tenantEmail: string) => {
+    try {
+      const { data } = await supabase
         .from('messages')
         .select('*')
-        .eq('conversation_id', conversationId)
+        .eq('apartment_id', apartmentId)
+        .or(`sender_email.eq.${tenantEmail},owner_email.eq.${tenantEmail}`)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Failed to load conversation messages:', error);
-        return;
+      if (data) {
+        setMessages(data);
       }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
 
-      setMessages((data || []).map(mapRowToMessage));
-      await markConversationAsRead(conversationId, user.id);
-      setConversations(prev =>
-        prev.map(conversation =>
-          conversation.conversationId === conversationId
-            ? { ...conversation, unreadCount: 0 }
-            : conversation
+  const markConversationAsRead = async (apartmentId: string, tenantEmail: string) => {
+    try {
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('apartment_id', apartmentId)
+        .eq('sender_email', tenantEmail);
+
+      // Update conversation unread count
+      const conversationKey = `${apartmentId}::${tenantEmail}`;
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.conversation_key === conversationKey
+            ? { ...conv, unread_count: 0 }
+            : conv
         )
       );
-      scrollToBottom();
-    },
-    [markConversationAsRead, scrollToBottom, supabase, user?.id]
-  );
-
-  const handleConversationSelect = useCallback(
-    (conversationId: string) => {
-      setSelectedConversationId(conversationId);
-      loadMessages(conversationId);
-    },
-    [loadMessages]
-  );
-
-  const handleSendMessage = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!user?.id || !selectedConversationId || !newMessage.trim()) {
-        return;
-      }
-
-      const conversation = conversations.find(
-        item => item.conversationId === selectedConversationId
-      );
-      if (!conversation || !conversation.tenantId) {
-        console.error('Conversation metadata missing when sending message');
-        return;
-      }
-
-      const sanitized = sanitizeUserInput(newMessage.trim());
-      if (!sanitized) {
-        return;
-      }
-
-      setSending(true);
-      try {
-        const conversationKey = buildConversationKey(
-          conversation.apartmentId,
-          user.id,
-          conversation.tenantId
-        );
-
-        const { error } = await supabase.from('messages').insert({
-          conversation_id: selectedConversationId,
-          conversation_key: conversationKey,
-          apartment_id: conversation.apartmentId,
-          sender_id: user.id,
-          receiver_id: conversation.tenantId,
-          content: sanitized,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        setNewMessage('');
-        await loadMessages(selectedConversationId);
-        await loadUserAndConversations();
-      } catch (error) {
-        console.error('Failed to send owner message:', error);
-      } finally {
-        setSending(false);
-      }
-    },
-    [conversations, loadMessages, loadUserAndConversations, newMessage, selectedConversationId, supabase, user?.id]
-  );
-
-  useEffect(() => {
-    loadUserAndConversations();
-  }, [loadUserAndConversations]);
-
-  useEffect(() => {
-    if (selectedConversationId) {
-      loadMessages(selectedConversationId);
+    } catch (error) {
+      console.error('Error marking as read:', error);
     }
-  }, [loadMessages, selectedConversationId]);
+  };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedConversation || !user) return;
 
-  useEffect(() => {
-    if (!user?.id) {
-      return;
+    setSending(true);
+    try {
+      const [apartmentId, tenantEmail] = selectedConversation.split('::');
+
+      const { error } = await supabase.from('messages').insert({
+        apartment_id: apartmentId,
+        sender_email: user.email,
+        owner_email: tenantEmail,
+        content: sanitizeUserInput(newMessage.trim(), false),
+        read: false,
+      });
+
+      if (error) throw error;
+
+      setNewMessage('');
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      alert('Error sending message: ' + error.message);
+    } finally {
+      setSending(false);
     }
+  };
 
-    const channel = supabase
-      .channel('owner-dashboard-messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload: any) => {
-          const newRow = payload.new as any;
-          if (!newRow) return;
-
-          const involvesOwner =
-            newRow.sender_id === user.id || newRow.receiver_id === user.id;
-          if (!involvesOwner) {
-            return;
-          }
-
-          if (selectedConversationId && newRow.conversation_id === selectedConversationId) {
-            setMessages(prev => [...prev, mapRowToMessage(newRow)]);
-            if (newRow.receiver_id === user.id) {
-              await markConversationAsRead(selectedConversationId, user.id);
-            }
-            scrollToBottom();
-          }
-
-          await loadUserAndConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [
-    loadUserAndConversations,
-    markConversationAsRead,
-    scrollToBottom,
-    selectedConversationId,
-    supabase,
-    user?.id,
-  ]);
+  const getTotalUnreadCount = () => {
+    return conversations.reduce((sum, conv) => sum + conv.unread_count, 0);
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-full">
-        <p className="text-gray-500">Loading messages...</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-8 px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Tenant Messages</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              Tenant Messages
+              {getTotalUnreadCount() > 0 && (
+                <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-yellow-400 text-gray-900">
+                  {getTotalUnreadCount()} unread
+                </span>
+              )}
+            </h1>
+            <p className="text-gray-600 mt-1">Respond to tenant inquiries</p>
+          </div>
+          <Link
+            href="/owner"
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition"
+          >
+            ← Back to Dashboard
+          </Link>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Conversations List */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-1">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Keep track of tenant questions and follow-ups.
-              </p>
-            </div>
+        {/* Chat Interface */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+          <div className="flex h-full">
+            {/* Conversations List */}
+            <div className="w-96 border-r border-gray-200 overflow-y-auto bg-gray-50">
+              <div className="p-4 border-b border-gray-200 bg-white">
+                <h2 className="text-sm font-semibold text-gray-900">All Conversations</h2>
+                <p className="text-xs text-gray-500 mt-1">{conversations.length} active chats</p>
+              </div>
 
-            <div className="divide-y divide-gray-100 max-h-[70vh] overflow-y-auto">
-              {conversations.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">
-                  <p>No tenant conversations yet. Replies will appear here.</p>
-                </div>
-              ) : (
-                conversations.map(conversation => {
-                  const isActive = conversation.conversationId === selectedConversationId;
-                  return (
+              {conversations.length > 0 ? (
+                <div className="divide-y divide-gray-200">
+                  {conversations.map((conv) => (
                     <button
-                      key={conversation.conversationId}
-                      onClick={() => handleConversationSelect(conversation.conversationId)}
-                      className={`w-full text-left px-4 py-3 transition ${
-                        isActive ? 'bg-yellow-50' : 'hover:bg-gray-50'
-                      }`}
+                      key={conv.conversation_key}
+                      onClick={() => setSelectedConversation(conv.conversation_key)}
+                      className={`w-full p-4 text-left hover:bg-white transition ${selectedConversation === conv.conversation_key ? 'bg-white border-l-4 border-yellow-400' : ''
+                        }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 flex-shrink-0">
-                          {conversation.apartmentImage ? (
+                        {conv.apartment_image && (
+                          <div className="w-14 h-14 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                             <img
-                              src={conversation.apartmentImage}
-                              alt={conversation.apartmentTitle}
-                              className="w-12 h-12 rounded-lg object-cover"
+                              src={conv.apartment_image}
+                              alt={conv.apartment_title}
+                              className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-sm text-gray-500">
-                              No image
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium text-gray-900 truncate">
-                              {conversation.tenantName}
-                            </h3>
-                            {conversation.unreadCount > 0 && (
-                              <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold bg-yellow-400 text-gray-900 rounded-full">
-                                {conversation.unreadCount}
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 truncate">
+                                {conv.tenant_name}
+                              </h3>
+                              <p className="text-xs text-gray-500 truncate">
+                                {conv.apartment_title}
+                              </p>
+                            </div>
+                            {conv.unread_count > 0 && (
+                              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-400 text-gray-900 flex-shrink-0">
+                                {conv.unread_count}
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 truncate">
-                            {conversation.apartmentTitle}
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {conv.last_message}
                           </p>
-                          <p className="text-xs text-gray-400">
-                            {new Date(conversation.lastMessageTime).toLocaleString()}
-                          </p>
-                          <p className="mt-1 text-sm text-gray-700 truncate">
-                            {conversation.lastMessage}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Chat Area */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-3 flex flex-col">
-            {selectedConversationId ? (
-              <>
-                {/* Chat Header */}
-                <div className="p-4 border-b border-gray-200 bg-white">
-                  {(() => {
-                    const conversation = conversations.find(
-                      c => c.conversationId === selectedConversationId
-                    );
-                    if (!conversation) return null;
-                    return (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{conversation.tenantName}</h3>
-                          <p className="text-sm text-gray-500">
-                            Re: {conversation.apartmentTitle}
-                          </p>
-                        </div>
-                        <Link
-                          href={`/apartments/${conversation.apartmentId}`}
-                          className="px-3 py-1.5 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium rounded-lg transition"
-                        >
-                          View Listing →
-                        </Link>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                  {messages.map(message => {
-                    const isOwn = message.senderId === user?.id;
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-md px-4 py-2 rounded-lg ${
-                            isOwn
-                              ? 'bg-yellow-400 text-gray-900'
-                              : 'bg-white border border-gray-200 text-gray-900'
-                          }`}
-                        >
-                          <p className="text-sm">{message.content}</p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              isOwn ? 'text-gray-700' : 'text-gray-500'
-                            }`}
-                          >
-                            {new Date(message.createdAt).toLocaleTimeString([], {
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(conv.last_message_time).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
                           </p>
                         </div>
                       </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Message Input */}
-                <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={event => setNewMessage(event.target.value)}
-                      placeholder="Type your response..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      disabled={sending}
-                    />
-                    <button
-                      type="submit"
-                      disabled={sending || !newMessage.trim()}
-                      className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {sending ? 'Sending...' : 'Send'}
                     </button>
-                  </div>
-                </form>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <svg
-                    className="w-20 h-20 mx-auto mb-4 text-gray-300"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                  <p className="text-lg font-medium text-gray-700">Select a conversation</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Choose a tenant conversation to view messages
-                  </p>
+                  ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <p className="text-sm font-medium">No messages yet</p>
+                  <p className="text-xs mt-1">Tenants will appear here when they contact you</p>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Area */}
+            <div className="flex-1 flex flex-col">
+              {selectedConversation ? (
+                <>
+                  {/* Chat Header */}
+                  <div className="p-4 border-b border-gray-200 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {conversations.find((c) => c.conversation_key === selectedConversation)?.tenant_name}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          Re: {conversations.find((c) => c.conversation_key === selectedConversation)?.apartment_title}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/apartments/${selectedConversation.split('::')[0]}`}
+                        className="px-3 py-1.5 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium rounded-lg transition"
+                      >
+                        View Listing →
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                    {messages.map((msg) => {
+                      const isOwn = msg.sender_email === user?.email;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-md px-4 py-2 rounded-lg ${isOwn
+                                ? 'bg-yellow-400 text-gray-900'
+                                : 'bg-white border border-gray-200 text-gray-900'
+                              }`}
+                          >
+                            <p className="text-sm">{msg.content}</p>
+                            <p className={`text-xs mt-1 ${isOwn ? 'text-gray-700' : 'text-gray-500'}`}>
+                              {new Date(msg.created_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Message Input */}
+                  <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type your response..."
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        disabled={sending}
+                      />
+                      <button
+                        type="submit"
+                        disabled={sending || !newMessage.trim()}
+                        className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {sending ? 'Sending...' : 'Send'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <svg className="w-20 h-20 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <p className="text-lg font-medium text-gray-700">Select a conversation</p>
+                    <p className="text-sm text-gray-500 mt-1">Choose a tenant conversation to view messages</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

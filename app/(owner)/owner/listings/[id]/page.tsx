@@ -44,10 +44,10 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/owner/listings" className="text-blue-600 hover:text-blue-700">
-                ← Back to Listings
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/owner/listings" className="text-blue-600 hover:text-blue-700">
+                Back to Listings
               </Link>
               <h1 className="text-2xl font-bold text-gray-900">{apartment.title}</h1>
             </div>

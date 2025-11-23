@@ -1,5 +1,7 @@
 import {
   createBrowserClient,
+  createServerClient,
+  type CookieOptions,
 } from '@supabase/ssr';
 import {
   createClient as createServiceRoleClientOriginal,
@@ -24,19 +26,66 @@ const getAnonKey = () => {
 
 let browserClient: SupabaseClient | null = null;
 
-const getBrowserClient = (): SupabaseClient => {
-  // Safety check: don't create browser client during SSR/build
-  if (typeof window === 'undefined') {
-    // Return a mock client for SSR that will be replaced on hydration
-    return {
-      from: () => ({ select: () => Promise.resolve({ data: [], error: null }) }),
-      auth: {
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signOut: () => Promise.resolve({ error: null }),
-      },
-    } as any as SupabaseClient;
+const cookieOptions: CookieOptions = {
+  maxAge: 60 * 60 * 24 * 365 * 10,
+  secure: process.env.NODE_ENV === 'production',
+  httpOnly: true,
+  sameSite: 'lax',
+  path: '/',
+};
+
+const getServerCookieStore = (): any | null => {
+  if (typeof window !== 'undefined') {
+    return null;
   }
-  
+
+  try {
+    // Dynamically require next/headers to avoid build-time import errors
+    const nodeRequire = Function('return require')() as (moduleId: string) => any;
+    const nextHeaders = nodeRequire('next/headers');
+    if (!nextHeaders?.cookies) {
+      return null;
+    }
+    return nextHeaders.cookies();
+  } catch (error) {
+    // next/headers not available (pages directory or build context)
+    return null;
+  }
+};
+
+const getServerClient = (): SupabaseClient => {
+  try {
+    const cookieStore = getServerCookieStore();
+    if (!cookieStore) {
+      throw new Error('No cookie store available');
+    }
+
+    return createServerClient(getUrl(), getAnonKey(), {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, { ...cookieOptions, ...options })
+            );
+          } catch {
+            // Called from a Server Component without mutable cookies support.
+            // Middleware should refresh the session in that scenario.
+          }
+        },
+      },
+    }) as SupabaseClient;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Supabase server client falling back to browser client (no cookies context).');
+    }
+    return getBrowserClient();
+  }
+};
+
+const getBrowserClient = (): SupabaseClient => {
   if (browserClient) {
     return browserClient;
   }
@@ -49,12 +98,16 @@ const getBrowserClient = (): SupabaseClient => {
  * ⚠️ For Server Components, use createClient from @/lib/supabase/server instead!
  */
 export function createClient(): SupabaseClient {
-  // Allow server-side usage for build compatibility
+  if (typeof window === 'undefined') {
+    return getServerClient();
+  }
   return getBrowserClient();
 }
 
 export function getBrowserSupabase(): SupabaseClient {
-  // Allow server-side usage for build compatibility
+  if (typeof window === 'undefined') {
+    return getServerClient();
+  }
   return getBrowserClient();
 }
 
@@ -79,22 +132,5 @@ export function createServiceRoleClient(): SupabaseClient {
 
 export const createServiceClient = createServiceRoleClient;
 
-// Lazy getter for default supabase client - don't create at module level
-let _cachedSupabase: SupabaseClient | null = null;
-export function getSupabase(): SupabaseClient {
-  if (typeof window === 'undefined') {
-    throw new Error('getSupabase() can only be called in browser context');
-  }
-  if (!_cachedSupabase) {
-    _cachedSupabase = getBrowserClient();
-  }
-  return _cachedSupabase;
-}
-
-// Legacy export - use getSupabase() instead
-export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    // Lazy initialization on first property access
-    return getSupabase()[prop as keyof SupabaseClient];
-  }
-});
+export const supabase: SupabaseClient =
+  typeof window === 'undefined' ? (null as unknown as SupabaseClient) : getBrowserClient();

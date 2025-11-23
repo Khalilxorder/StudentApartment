@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/utils/supabaseClient';
+import { createClient } from '@/lib/supabase/server';
 import { cache, cacheHelpers } from '@/lib/cache';
 import { rateLimiter } from '@/lib/rate-limit';
 import { maskContactInfo } from '@/lib/messaging';
@@ -16,6 +16,22 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
+    const unreadOnly = searchParams.get('unreadOnly') === 'true';
+
+    if (unreadOnly) {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .is('read_at', null);
+
+      if (error) {
+        console.error('Unread count error:', error);
+        return NextResponse.json({ error: 'Failed to fetch unread count' }, { status: 500 });
+      }
+
+      return NextResponse.json({ count: count ?? 0 });
+    }
 
     if (conversationId) {
       // Get messages for a specific conversation
@@ -95,13 +111,18 @@ export async function GET(request: NextRequest) {
           const otherUserId = isStudent ? conv.owner_id : conv.student_id;
           const otherUserRole = isStudent ? 'owner' : 'student';
 
-          // Get other user's profile
+          // Get other user's profile with first_name, last_name, avatar_url
           const tableName = otherUserRole === 'owner' ? 'profiles_owner' : 'profiles_student';
           const { data: profile } = await supabase
             .from(tableName)
-            .select('full_name')
+            .select('full_name, phone, email')
             .eq('id', otherUserId)
             .maybeSingle();
+
+          // Split full_name into first and last name
+          const nameParts = (profile?.full_name || 'Unknown User').split(' ');
+          const firstName = nameParts[0] || 'Unknown';
+          const lastName = nameParts.slice(1).join(' ') || 'User';
 
           return {
             id: conv.id,
@@ -109,8 +130,17 @@ export async function GET(request: NextRequest) {
             apartment: conv.apartment,
             otherUserId,
             otherUserRole,
-            otherUserName: profile?.full_name || 'Unknown User',
-            lastMessage: conv.last_message_preview,
+            otherUser: {
+              first_name: firstName,
+              last_name: lastName,
+              avatar_url: null, // Can be extended if avatar URLs are stored
+              user_type: otherUserRole,
+            },
+            lastMessage: conv.last_message_preview ? {
+              content: conv.last_message_preview,
+              created_at: conv.last_message_at,
+              sender_id: null, // We don't track this in the preview
+            } : null,
             lastMessageAt: conv.last_message_at,
             unreadCount: isStudent ? conv.unread_count_student : conv.unread_count_owner,
             status: conv.status,
@@ -136,8 +166,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Use service client for writes to bypass RLS if needed
-    const supabase = createServiceClient();
+    const supabase = createClient();
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -145,12 +174,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Rate limiting: 5 messages per hour per user
-    const rateLimitResult = await rateLimiter.check(user.id, '/api/messages', 5, 60 * 60 * 1000);
+    // Rate limiting: 50 messages per hour per user (increased from 5)
+    const rateLimitResult = await rateLimiter.check(user.id, '/api/messages', 50, 60 * 60 * 1000);
 
     if (!rateLimitResult.success) {
       return NextResponse.json({
-        error: 'Rate limit exceeded. You can send up to 5 messages per hour.',
+        error: 'Rate limit exceeded. You can send up to 50 messages per hour.',
         retryAfter: Math.ceil(rateLimitResult.reset / 1000)
       }, {
         status: 429,
@@ -174,12 +203,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'apartmentId required to start new conversation' }, { status: 400 });
       }
 
-      // Create or get existing conversation
+      // Get apartment owner to determine student/owner roles
+      const { data: apartment } = await supabase
+        .from('apartments')
+        .select('owner_id')
+        .eq('id', apartmentId)
+        .single();
+
+      if (!apartment) {
+        return NextResponse.json({ error: 'Apartment not found' }, { status: 404 });
+      }
+
+      // Determine student_id and owner_id
+      const isUserOwner = apartment.owner_id === user.id;
+      const studentId = isUserOwner ? receiverId : user.id;
+      const ownerId = isUserOwner ? user.id : receiverId;
+
+      // Create or get existing conversation using the new RPC function
       const { data: newConversationId, error: convError } = await supabase
-        .rpc('get_or_create_conversation', {
+        .rpc('get_or_create_conversation_v2', {
           p_apartment_id: apartmentId,
-          p_participant1_id: user.id,
-          p_participant2_id: receiverId
+          p_student_id: studentId,
+          p_owner_id: ownerId
         });
 
       if (convError || !newConversationId) {
@@ -197,14 +242,17 @@ export async function POST(request: NextRequest) {
     // Validate that the user is a participant in this conversation
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('participant1_id, participant2_id')
+      .select('student_id, owner_id')
       .eq('id', finalConversationId)
       .single();
 
     if (!conversation ||
-        (conversation.participant1_id !== user.id && conversation.participant2_id !== user.id)) {
+      (conversation.student_id !== user.id && conversation.owner_id !== user.id)) {
       return NextResponse.json({ error: 'Unauthorized to send message in this conversation' }, { status: 403 });
     }
+
+    // Determine receiver_id for the message
+    const messageReceiverId = conversation.student_id === user.id ? conversation.owner_id : conversation.student_id;
 
     // Insert message
     const { data: message, error: insertError } = await supabase
@@ -212,38 +260,26 @@ export async function POST(request: NextRequest) {
       .insert({
         conversation_id: finalConversationId,
         sender_id: user.id,
-        receiver_id: receiverId,
+        receiver_id: messageReceiverId,
         content: maskContactInfo(content.trim()),
-        read: false,
       })
       .select(`
         id,
         content,
         created_at,
-        read,
-        sender:user_profiles!messages_sender_id_fkey(
-          first_name,
-          last_name,
-          avatar_url,
-          user_type
-        )
+        sender_id,
+        receiver_id
       `)
       .single();
 
     if (insertError) {
       console.error('Message insert error:', insertError);
-      return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to send message', details: insertError.message }, { status: 500 });
     }
-
-    // Update conversation last_message_at
-    await supabase
-      .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', finalConversationId);
 
     // Invalidate conversation caches for both users
     await cache.invalidateByTag(`user:${user.id}`);
-    await cache.invalidateByTag(`user:${receiverId}`);
+    await cache.invalidateByTag(`user:${messageReceiverId}`);
     await cache.invalidateByTag('conversations');
 
     return NextResponse.json({ message });

@@ -359,58 +359,49 @@ export class SearchServiceImpl {
       return this.keywordSearch(query, filters);
     }
 
-    try {
-      const vector = await embeddingSvc.embedText(query);
-      // CRITICAL: Enforce 768-d vector dimensions before DB query
-      embeddingSvc.validateDimensions(vector, 768);
-      const embedding = embeddingSvc.toSqlVector(vector);
-      const limit = filters.limit ?? DEFAULT_LIMIT;
+    const vector = await embeddingSvc.embedText(query);
+    const embedding = embeddingSvc.toSqlVector(vector);
+    const limit = filters.limit ?? DEFAULT_LIMIT;
 
-      const { rows } = await runQuery(
-        `
-        SELECT
-          a.id,
-          a.title,
-          a.description,
-          a.monthly_rent_huf AS price,
-          a.room_count AS rooms,
-          a.latitude,
-          a.longitude,
-          a.address,
-          a.district,
-          array_agg(amen.name ORDER BY amen.name) AS amenities,
-          array_agg(COALESCE(am.variants->>'large', am.variants->>'medium', am.file_path)) AS photo_urls,
-          po.full_name AS owner_name,
-          (po.verification_status = 'verified') AS owner_verified,
-          a.media_quality_score,
-          a.completeness_score,
-          a.commute_cache,
-          ae.combined_embedding <=> $1::vector AS similarity
-        FROM public.apartment_embeddings ae
-        JOIN public.apartments a ON a.id = ae.apartment_id
-        LEFT JOIN public.apartment_amenities aa ON aa.apartment_id = a.id
-        LEFT JOIN public.amenities amen ON amen.id = aa.amenity_id
-        LEFT JOIN public.apartment_media am ON am.apartment_id = a.id
-        LEFT JOIN public.profiles_owner po ON po.id = a.owner_id
-        WHERE a.status = 'published'
-          AND ae.combined_embedding IS NOT NULL
-        GROUP BY a.id, po.full_name, po.verification_status, a.media_quality_score, a.completeness_score, a.commute_cache, ae.combined_embedding
-        ORDER BY ae.combined_embedding <=> $1::vector
-        LIMIT $2 OFFSET $3
-      `,
-        [embedding, limit, filters.offset ?? 0],
-      );
+    const { rows } = await runQuery(
+      `
+      SELECT
+        a.id,
+        a.title,
+        a.description,
+        a.monthly_rent_huf AS price,
+        a.room_count AS rooms,
+        a.latitude,
+        a.longitude,
+        a.address,
+        a.district,
+        array_agg(amen.name ORDER BY amen.name) AS amenities,
+        array_agg(COALESCE(am.variants->>'large', am.variants->>'medium', am.file_path)) AS photo_urls,
+        po.full_name AS owner_name,
+        (po.verification_status = 'verified') AS owner_verified,
+        a.media_quality_score,
+        a.completeness_score,
+        a.commute_cache,
+        ae.description_embedding <=> $1::vector AS similarity
+      FROM public.apartment_embeddings ae
+      JOIN public.apartments a ON a.id = ae.apartment_id
+      LEFT JOIN public.apartment_amenities aa ON aa.apartment_id = a.id
+      LEFT JOIN public.amenities amen ON amen.id = aa.amenity_id
+      LEFT JOIN public.apartment_media am ON am.apartment_id = a.id
+      LEFT JOIN public.profiles_owner po ON po.id = a.owner_id
+      WHERE a.status = 'published'
+      GROUP BY a.id, po.full_name, po.verification_status, a.media_quality_score, a.completeness_score, a.commute_cache, ae.description_embedding
+      ORDER BY ae.description_embedding <=> $1::vector
+      LIMIT $2 OFFSET $3
+    `,
+      [embedding, limit, filters.offset ?? 0],
+    );
 
-      return rows.map((row: any, idx: number) => {
-        const similarity = typeof row.similarity === 'number' ? row.similarity : 0;
-        const score = Math.max(0.6, 1 - similarity - idx * 0.01);
-        return this.mapRowToResult(row, 'semantic', score, filters);
-      });
-    } catch (error: any) {
-      console.error('[SemanticSearch] Error:', error?.message);
-      // Fall back to keyword search on dimension mismatch or other errors
-      return this.keywordSearch(query, filters);
-    }
+    return rows.map((row: any, idx: number) => {
+      const similarity = typeof row.similarity === 'number' ? row.similarity : 0;
+      const score = Math.max(0.6, 1 - similarity - idx * 0.01);
+      return this.mapRowToResult(row, 'semantic', score, filters);
+    });
   }
 
   async hybridSearch(query: string, filters: SearchFilters): Promise<SearchResult[]> {

@@ -60,7 +60,7 @@ export default function SiteHeader() {
 					})}
 				</nav>
 
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-4">
 					<UserAuthStatus />
 				</div>
 			</div>

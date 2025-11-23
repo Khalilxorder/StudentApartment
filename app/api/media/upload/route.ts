@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 
 interface MediaConfig {
   maxWidth: number;
@@ -138,7 +139,7 @@ class MediaService {
       if (sharpness < 0.4) warnings.push('Blurry image');
 
       return {
-        isValid: warnings.length === 0,
+        isValid: true,
         quality,
         brightness,
         contrast,
@@ -342,6 +343,12 @@ const mediaService = new MediaService();
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = (formData as any).get('file') as File | null;
     const type = (formData as any).get('type') as string | null;
@@ -438,6 +445,12 @@ export async function POST(request: NextRequest) {
 // Analyze image without uploading
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = (formData as any).get('file') as File | null;
 

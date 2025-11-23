@@ -77,7 +77,7 @@ export function QuickDraftForm({ initialId, onDraftSaved }: QuickDraftFormProps)
         formData.set('title', title);
         formData.set('address', address);
         formData.set('price_huf', price.toString());
-        formData.set('image_urls', JSON.stringify(imageUrls));
+        imageUrls.forEach((url) => formData.append('image_urls', url));
 
         const result = await saveDraft(formData);
 
@@ -111,7 +111,7 @@ export function QuickDraftForm({ initialId, onDraftSaved }: QuickDraftFormProps)
 
       {success && (
         <div className="p-2 bg-green-100 border border-green-300 rounded text-green-800 text-sm">
-          ✓ Draft saved successfully! You can resume editing anytime.
+          Draft saved successfully! You can resume editing anytime.
         </div>
       )}
 
@@ -173,7 +173,7 @@ export function QuickDraftForm({ initialId, onDraftSaved }: QuickDraftFormProps)
                     onClick={() => setImageUrls(prev => prev.filter((_, i) => i !== idx))}
                     className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition"
                   >
-                    ✕
+                    X
                   </button>
                 </div>
               ))}

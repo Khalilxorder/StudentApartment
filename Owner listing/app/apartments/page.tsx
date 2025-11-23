@@ -1,0 +1,219 @@
+import { createClient } from '@/utils/supabaseClient';
+import Link from 'next/link';
+import SearchBar from './SearchBar';
+import SaveSearchButton from '../../components/SaveSearchButton';
+
+// Logo component
+const Logo = ({ className }: { className?: string }) => (
+  <svg
+    width="54"
+    height="43"
+    viewBox="0 0 54 43"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <rect x="11" y="18" width="32" height="25" rx="1" fill="#823D00" />
+    <path
+      d="M25.5675 1.47034C26.3525 0.664564 27.6475 0.664563 28.4325 1.47034L47.0744 20.6043C48.309 21.8716 47.4111 24 45.6418 24H8.35816C6.58888 24 5.69098 21.8716 6.92564 20.6043L25.5675 1.47034Z"
+      fill="url(#paint0_linear_32_2)"
+    />
+    <path
+      d="M23 34C23 33.4477 23.4477 33 24 33H30C30.5523 33 31 33.4477 31 34V42C31 42.5523 30.5523 43 30 43H24C23.4477 43 23 42.5523 23 42V34Z"
+      fill="#482100"
+    />
+    <rect x="24" y="12" width="6" height="6" rx="1" fill="#AE5100" />
+    <defs>
+      <linearGradient
+        id="paint0_linear_32_2"
+        x1="27"
+        y1="0"
+        x2="27"
+        y2="32"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="#823D00" />
+        <stop offset="1" stopColor="#1C0D00" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+export default async function ApartmentsPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string> | undefined;
+}) {
+  const supabase = createClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  // Build query based on search parameters
+  let query = supabase
+    .from('apartments')
+    .select('*', { count: 'exact' })
+    .eq('is_available', true);
+
+  // Apply filters from search params
+  if (searchParams?.district) {
+    query = query.eq('district', parseInt(searchParams.district));
+  }
+  if (searchParams?.bedrooms) {
+    query = query.gte('bedrooms', parseInt(searchParams.bedrooms));
+  }
+  if (searchParams?.min_price) {
+    query = query.gte('price_huf', parseInt(searchParams.min_price));
+  }
+  if (searchParams?.max_price) {
+    query = query.lte('price_huf', parseInt(searchParams.max_price));
+  }
+
+  // Order by date
+  query = query.order('created_at', { ascending: false });
+
+  // Pagination
+  const page = parseInt(searchParams?.page || '1');
+  const itemsPerPage = 12;
+  const from = (page - 1) * itemsPerPage;
+  const to = from + itemsPerPage - 1;
+
+  query = query.range(from, to);
+
+  const { data: apartments, count } = await query;
+
+  return (
+    <div className='min-h-screen bg-gray-100'>
+      {/* Header with Logo */}
+      <header className="bg-white shadow-sm border-b px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <Logo className="h-10 w-auto" />
+          <div>
+            <h1 className="text-gray-900 font-bold text-lg">Student Apartments</h1>
+            <p className="text-gray-600 text-xs">AI-Powered Search</p>
+          </div>
+        </Link>
+        <div className="flex gap-3 items-center">
+          {session ? (
+            <>
+              <Link
+                href="/apartments"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Browse
+              </Link>
+              <Link
+                href="/admin"
+                className="text-sm font-medium px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Admin
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm font-medium px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+            >
+              Login
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className='max-w-6xl mx-auto p-4'>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-2xl font-bold'>Browse Apartments</h2>
+        </div>
+
+        <SearchBar initialParams={searchParams} />
+
+        <div className='mb-4 flex gap-2'>
+          <Link href='/apartments' className='px-4 py-2 bg-gray-200 rounded'>Clear Filters</Link>
+          <SaveSearchButton searchParams={searchParams} session={session} />
+        </div>
+
+        <p className='mb-4 text-lg font-semibold'>Found {count || 0} apartments</p>
+
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+          {apartments?.map((apartment) => (
+            <Link key={apartment.id} href={`/apartments/${apartment.id}`} className='bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden block group'>
+              {/* Image */}
+              <div className='relative h-48 bg-gray-200'>
+                {apartment.image_urls && apartment.image_urls[0] ? (
+                  <img 
+                    src={apartment.image_urls[0]} 
+                    alt={apartment.title} 
+                    className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-300'
+                  />
+                ) : (
+                  <div className='w-full h-full flex items-center justify-center text-gray-400'>
+                    <span className='text-6xl'>🏠</span>
+                  </div>
+                )}
+                <div className='absolute top-3 right-3 bg-orange-500 text-white px-3 py-1 rounded-full font-bold text-sm shadow-lg'>
+                  {apartment.price_huf?.toLocaleString()} HUF
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className='p-4'>
+                <h3 className='font-bold text-lg text-gray-900 group-hover:text-orange-600 transition-colors mb-2 line-clamp-2'>
+                  {apartment.title}
+                </h3>
+                
+                <p className='text-sm text-gray-600 mb-2'>
+                  🛏️ {apartment.bedrooms} beds • � {apartment.bathrooms || 1} bath
+                </p>
+                
+                <p className='text-sm text-gray-600 mb-2'>
+                  �📍 District {apartment.district}
+                </p>
+
+                {apartment.size_sqm && (
+                  <p className='text-sm text-gray-600 mb-2'>
+                    � {apartment.size_sqm} m²
+                  </p>
+                )}
+
+                {apartment.owner_name && (
+                  <p className='text-sm text-gray-500 mb-2'>
+                    👤 Owner: {apartment.owner_name}
+                  </p>
+                )}
+
+                <div className='text-orange-600 font-medium mt-3'>
+                  View Details →
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Pagination */}
+        {count && count > itemsPerPage && (
+          <div className='mt-8 flex justify-center gap-2'>
+            {page > 1 && (
+              <Link
+                href={`/apartments?page=${page - 1}`}
+                className='px-4 py-2 bg-blue-500 text-white rounded'
+              >
+                Previous
+              </Link>
+            )}
+            <span className='px-4 py-2'>Page {page}</span>
+            {from + itemsPerPage < count && (
+              <Link
+                href={`/apartments?page=${page + 1}`}
+                className='px-4 py-2 bg-blue-500 text-white rounded'
+              >
+                Next
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

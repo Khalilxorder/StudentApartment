@@ -34,6 +34,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'img.icons8.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
     ],
     // Optimize images
     formats: ['image/webp', 'image/avif'],

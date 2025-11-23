@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import UserAuthStatus from '@/components/UserAuthStatus';
 
 export default async function UserDashboard() {
@@ -47,14 +48,11 @@ export default async function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <UserAuthStatus />
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Banner */}
         <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow-lg p-8 mb-8 text-gray-900">
           <h1 className="text-3xl font-bold mb-2">
-            Welcome back! 👋
+            Welcome back!
           </h1>
           <p className="text-gray-800 text-lg">
             Find your perfect student apartment in Budapest
@@ -129,7 +127,7 @@ export default async function UserDashboard() {
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Recent Favorites</h2>
                 <Link href="/dashboard/favorites" className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
-                  View All →
+                  View All
                 </Link>
               </div>
               <div className="divide-y divide-gray-200">
@@ -149,11 +147,13 @@ export default async function UserDashboard() {
                   favorites.map((fav: any) => (
                     <Link key={fav.id} href={`/apartments/${fav.apartment_id}`} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition">
                       {fav.apartments?.image_urls?.[0] && (
-                        <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
+                        <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <Image
                             src={fav.apartments.image_urls[0]}
                             alt={fav.apartments.title}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
+                            sizes="80px"
                           />
                         </div>
                       )}
@@ -189,7 +189,7 @@ export default async function UserDashboard() {
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">My Applications</h2>
                 <Link href="/dashboard/bookings" className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
-                  View All →
+                  View All
                 </Link>
               </div>
               <div className="divide-y divide-gray-200">
@@ -214,11 +214,13 @@ export default async function UserDashboard() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           {booking.apartments?.image_urls?.[0] && (
-                            <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                              <img
+                            <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 relative">
+                              <Image
                                 src={booking.apartments.image_urls[0]}
                                 alt={booking.apartments.title}
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
+                                sizes="64px"
                               />
                             </div>
                           )}
@@ -235,12 +237,11 @@ export default async function UserDashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            booking.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              booking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                            }`}>
                             {booking.status}
                           </span>
                           <p className="text-sm font-medium text-gray-900 mt-2">
@@ -307,9 +308,7 @@ export default async function UserDashboard() {
                 <div className="space-y-2">
                   {recentSearches.slice(0, 3).map((search: any) => (
                     <div key={search.id} className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
-                                        <div className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
                       &ldquo;{search.query_text?.substring(0, 50)}...&rdquo;
-                    </div>
                     </div>
                   ))}
                 </div>
@@ -318,18 +317,18 @@ export default async function UserDashboard() {
 
             {/* Tips */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-sm font-semibold text-gray-900 mb-4">💡 Tips</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">Tips</h2>
               <ul className="space-y-3 text-sm text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 mt-0.5">•</span>
+                  <span className="text-yellow-500 mt-0.5">*</span>
                   <span>Save favorites to compare apartments later</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 mt-0.5">•</span>
+                  <span className="text-yellow-500 mt-0.5">*</span>
                   <span>Contact landlords early for popular listings</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 mt-0.5">•</span>
+                  <span className="text-yellow-500 mt-0.5">*</span>
                   <span>Check transportation links to your university</span>
                 </li>
               </ul>

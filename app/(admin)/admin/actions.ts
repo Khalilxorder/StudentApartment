@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient, createServiceRoleClient } from '@/utils/supabaseClient';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/utils/supabaseClient';
 import { revalidatePath } from 'next/cache';
 
 type ParsedApartmentForm = {

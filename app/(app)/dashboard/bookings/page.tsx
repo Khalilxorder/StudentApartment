@@ -28,12 +28,7 @@ export default async function BookingsPage() {
               Track your booking requests and lease agreements
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition"
-          >
-            ← Back to Dashboard
-          </Link>
+
         </div>
 
         {/* Bookings List */}
@@ -75,7 +70,7 @@ export default async function BookingsPage() {
                             />
                           </Link>
                         )}
-                        
+
                         <div className="flex-1 min-w-0">
                           <Link href={`/apartments/${booking.apartment_id}`}>
                             <h3 className="text-lg font-semibold text-gray-900 hover:text-yellow-600 transition">
@@ -85,7 +80,7 @@ export default async function BookingsPage() {
                           <p className="text-sm text-gray-600 mt-1">
                             📍 {apt?.address || `District ${apt?.district}, Budapest`}
                           </p>
-                          
+
                           {/* Booking Details */}
                           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                             <div>
@@ -120,7 +115,7 @@ export default async function BookingsPage() {
                               {booking.status.toUpperCase()}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-500">Payment:</span>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${paymentColors[booking.payment_status as keyof typeof paymentColors] || paymentColors.unpaid}`}>
@@ -152,7 +147,7 @@ export default async function BookingsPage() {
                               Complete Payment
                             </Link>
                           )}
-                          
+
                           {booking.status === 'approved' && booking.payment_status === 'paid' && (
                             <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
                               <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

@@ -18,6 +18,7 @@ import SearchOriginBadge, {
 import WhyThisModal from './WhyThisModal';
 import ChatHistory from './chat-search/ChatHistory';
 import ChatControls from './chat-search/ChatControls';
+import { SaveApartmentButton } from '@/components/SaveApartmentButton';
 import type { Message, WhyModalState } from './chat-search/types';
 
 const EXPLAIN_WEIGHTS = [0.85, 0.7, 0.55];
@@ -53,6 +54,7 @@ function buildExplainReasons(
 }
 
 export default function ChatSearch() {
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -76,12 +78,34 @@ export default function ChatSearch() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
 
+  const fetchCsrfToken = async () => {
+    const response = await fetch('/api/csrf', { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CSRF token (${response.status})`);
+    }
+
+    const data = await response.json();
+    if (!data?.csrfToken) {
+      throw new Error('CSRF token missing in response');
+    }
+
+    return data.csrfToken as string;
+  };
+
+  // Set mounted state to prevent hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Load cached data on mount OR clear if URL has ?clear parameter
   useEffect(() => {
+    if (!mounted) return; // Only run after component is mounted
+
     // Check if we should clear the cache (home icon was clicked)
     const urlParams = new URLSearchParams(window.location.search);
     const shouldClear = urlParams.get('clear') === 'true' || window.location.pathname === '/';
-    
+
     if (shouldClear && window.location.search.includes('clear')) {
       // Clear everything and remove the parameter
       localStorage.removeItem('chatSearch_results');
@@ -90,7 +114,7 @@ export default function ChatSearch() {
       setCurrentResults([]);
       setMessages([]);
       setUserWishedFeatures([]);
-      
+
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     } else {
@@ -98,7 +122,7 @@ export default function ChatSearch() {
       const cachedResults = localStorage.getItem('chatSearch_results');
       const cachedMessages = localStorage.getItem('chatSearch_messages');
       const cachedFeatures = localStorage.getItem('chatSearch_features');
-      
+
       if (cachedResults) {
         try {
           setCurrentResults(JSON.parse(cachedResults));
@@ -106,7 +130,7 @@ export default function ChatSearch() {
           console.warn('Failed to load cached results:', err);
         }
       }
-      
+
       if (cachedMessages) {
         try {
           setMessages(JSON.parse(cachedMessages));
@@ -114,7 +138,7 @@ export default function ChatSearch() {
           console.warn('Failed to load cached messages:', err);
         }
       }
-      
+
       if (cachedFeatures) {
         try {
           setUserWishedFeatures(JSON.parse(cachedFeatures));
@@ -128,40 +152,43 @@ export default function ChatSearch() {
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [mounted]);
 
   // Save to cache when data changes
   useEffect(() => {
+    if (!mounted) return;
     if (currentResults.length > 0) {
       localStorage.setItem('chatSearch_results', JSON.stringify(currentResults));
     } else {
       localStorage.removeItem('chatSearch_results');
     }
-  }, [currentResults]);
+  }, [currentResults, mounted]);
 
   useEffect(() => {
+    if (!mounted) return;
     if (messages.length > 0) {
       localStorage.setItem('chatSearch_messages', JSON.stringify(messages));
     } else {
       localStorage.removeItem('chatSearch_messages');
     }
-  }, [messages]);
+  }, [messages, mounted]);
 
   useEffect(() => {
+    if (!mounted) return;
     if (userWishedFeatures.length > 0) {
       localStorage.setItem('chatSearch_features', JSON.stringify(userWishedFeatures));
     } else {
       localStorage.removeItem('chatSearch_features');
     }
-  }, [userWishedFeatures]);
+  }, [userWishedFeatures, mounted]);
 
   useEffect(() => {
     const getSession = async () => {
@@ -203,9 +230,9 @@ export default function ChatSearch() {
   }, [currentResults, sortBy, currentPage]);
 
   const pushMessage = (from: 'user' | 'ai' | 'system', text: string) => {
-    setMessages(m => [...m, { 
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
-      from, 
+    setMessages(m => [...m, {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      from,
       text
     }]);
   };
@@ -301,8 +328,8 @@ export default function ChatSearch() {
     }
 
     // Match "120k or lower", "under 100k", "below 150000", "max 120k"
-    const maxPriceMatch = lower.match(/(\d+)(?:k|000|,000)?\s*(?:or\s*)?(?:lower|less|under|below|max|maximum|up\s*to)/i) || 
-                           lower.match(/(?:under|below|max|maximum|up\s*to|less\s*than)\s*(\d+)(?:k|000|,000)?/i);
+    const maxPriceMatch = lower.match(/(\d+)(?:k|000|,000)?\s*(?:or\s*)?(?:lower|less|under|below|max|maximum|up\s*to)/i) ||
+      lower.match(/(?:under|below|max|maximum|up\s*to|less\s*than)\s*(\d+)(?:k|000|,000)?/i);
     if (maxPriceMatch) {
       const price = parseInt(maxPriceMatch[1]);
       result.maxPrice = price > 1000 ? price : price * 1000;
@@ -317,7 +344,7 @@ export default function ChatSearch() {
 
     // Match ranges like "100-120k", "between 100 and 120k", "100 to 120k"
     const rangeMatch = lower.match(/(\d+)(?:\s*-\s*|\s*to\s*|\s*and\s*)(\d+)(?:k|000|,000)?/i) ||
-                        lower.match(/(?:between|from)\s+(\d+)(?:\s*-\s*|\s*to\s*|\s*and\s*)(\d+)(?:k|000|,000)?/i);
+      lower.match(/(?:between|from)\s+(\d+)(?:\s*-\s*|\s*to\s*|\s*and\s*)(\d+)(?:k|000|,000)?/i);
     if (rangeMatch) {
       const minPrice = parseInt(rangeMatch[1]);
       const maxPrice = parseInt(rangeMatch[2]);
@@ -330,7 +357,7 @@ export default function ChatSearch() {
     if (districtMatch) result.district = parseInt(districtMatch[1]);
 
     const keywords: string[] = [];
-    ['furnished','balcony','elevator','wifi','parking','pet','bright','quiet','cozy','modern','renovated','studio','private'].forEach(k => { if (lower.includes(k)) keywords.push(k); });
+    ['furnished', 'balcony', 'elevator', 'wifi', 'parking', 'pet', 'bright', 'quiet', 'cozy', 'modern', 'renovated', 'studio', 'private'].forEach(k => { if (lower.includes(k)) keywords.push(k); });
     if (keywords.length) result.search = keywords.join(' ');
 
     console.log('✅ Parse result:', result);
@@ -409,29 +436,29 @@ export default function ChatSearch() {
     const normalized = (data ?? []).map((apt: any) => {
       const amenities = Array.isArray(apt.apartment_amenities)
         ? apt.apartment_amenities
-            .map((entry: any) =>
-              entry?.amenity?.label ?? entry?.amenity?.code ?? entry?.amenity_code ?? null,
-            )
-            .filter((value: string | null): value is string => Boolean(value))
+          .map((entry: any) =>
+            entry?.amenity?.label ?? entry?.amenity?.code ?? entry?.amenity_code ?? null,
+          )
+          .filter((value: string | null): value is string => Boolean(value))
         : [];
 
       const { apartment_amenities, monthly_rent_huf, ...rest } = apt;
-      return { 
-        ...rest, 
+      return {
+        ...rest,
         price_huf: monthly_rent_huf, // Normalize for UI compatibility
-        amenities 
+        amenities
       };
     });
 
     console.log(`?? Found ${normalized.length} apartments from database`);
     return normalized;
-  };  const runSearchFlow = async (story: string) => {
+  }; const runSearchFlow = async (story: string) => {
     setLoading(true);
     const sanitizedStory = sanitizeUserInput(story);
     setCurrentPage(1);
     setDisplayedResults([]);
     pushMessage('user', sanitizedStory);
-    
+
     if (!isOnline) {
       pushMessage('ai', '📱 You are currently offline. Showing your previous search results...');
       // Show cached results if available
@@ -456,21 +483,25 @@ export default function ChatSearch() {
 
     const localParse = parseNaturalLanguage(sanitizedStory);
     const detectedFeatures = matchFeaturesFromStory(sanitizedStory);
-    
+
     setUserWishedFeatures(detectedFeatures);
     if (detectedFeatures.length > 0) {
       pushMessage('system', `✨ Detected ${detectedFeatures.length} features`);
     }
 
     try {
+      const csrfToken = await fetchCsrfToken();
       console.log('🤖 Calling Gemini AI via secure API...');
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
         body: JSON.stringify({ story: sanitizedStory }),
         signal: AbortSignal.timeout(30000) // 30 second timeout
       });
-      
+
       if (response.ok) {
         const { analysis } = await response.json();
         console.log('✅ Gemini AI response:', analysis);
@@ -502,7 +533,7 @@ export default function ChatSearch() {
     }
 
     let apartments = await fetchApartments(localParse);
-    
+
     // Early return if no apartments found
     if (!apartments || apartments.length === 0) {
       pushMessage('ai', `❌ No apartments found matching your criteria. Try:
@@ -516,14 +547,14 @@ export default function ChatSearch() {
     let scored = apartments.map((apt: any) => {
       // Extract features from apartment data
       const apartmentFeatures: string[] = [];
-      
+
       // Add features based on boolean flags
       if (apt.pet_friendly) apartmentFeatures.push('amen_pet_friendly');
       if (apt.parking_available) apartmentFeatures.push('loc_parking_street');
       if (apt.internet_included) apartmentFeatures.push('amen_internet');
       if (apt.laundry_in_unit) apartmentFeatures.push('amen_washing_machine');
       if (apt.elevator) apartmentFeatures.push('amen_elevator');
-      
+
       // Add features based on amenities array
       if (apt.amenities && Array.isArray(apt.amenities)) {
         apt.amenities.forEach((amenity: string) => {
@@ -540,14 +571,14 @@ export default function ChatSearch() {
           if (amenityLower.includes('pool')) apartmentFeatures.push('amen_pool');
         });
       }
-      
+
       // Add location-based features
       if (apt.distance_to_metro_m && apt.distance_to_metro_m < 1000) apartmentFeatures.push('loc_metro');
       if (apt.distance_to_university_m && apt.distance_to_university_m < 2000) apartmentFeatures.push('loc_university');
-      
+
       const userFeatureIds = detectedFeatures.map(f => f.id);
       const featureScore = calculateFeatureMatchScore(apartmentFeatures, userFeatureIds);
-      
+
       return {
         ...apt,
         featureMatchScore: featureScore,
@@ -660,13 +691,13 @@ export default function ChatSearch() {
       const response = await fetch('/api/ai/followup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          story: sanitizedStory, 
-          preferences: localParse, 
-          askedQuestions: Array.from(askedQuestions) 
+        body: JSON.stringify({
+          story: sanitizedStory,
+          preferences: localParse,
+          askedQuestions: Array.from(askedQuestions)
         })
       });
-      
+
       if (response.ok) {
         const { questions } = await response.json();
         const normalizedQuestions = Array.isArray(questions) ? questions.filter(Boolean) : [];
@@ -733,7 +764,7 @@ export default function ChatSearch() {
                   <h2 className="text-xl font-semibold text-gray-800 mb-2">Start your apartment search</h2>
                   <p className="text-gray-700 mb-6">Tell me your story</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
-                    <button 
+                    <button
                       onClick={() => setQuery("I'm a student at ELTE with 100k budget, want modern apartment near metro")}
                       className="p-5 bg-orange-50 hover:bg-orange-100 rounded-xl text-left border border-orange-200 transition"
                       aria-label="Use student example search: Student at ELTE, 100k budget, modern apartment near metro"
@@ -741,7 +772,7 @@ export default function ChatSearch() {
                       <div className="font-medium text-gray-900 mb-1">🎓 Student</div>
                       <div className="text-sm text-gray-700">&ldquo;Student at ELTE, 100k budget...&rdquo;</div>
                     </button>
-                    <button 
+                    <button
                       onClick={() => setQuery("Looking for 2BR with balcony, quiet, budget 150k")}
                       className="p-5 bg-blue-50 hover:bg-blue-100 rounded-xl text-left border border-blue-200 transition"
                       aria-label="Use couple example search: 2BR with balcony, quiet, budget 150k"
@@ -758,11 +789,10 @@ export default function ChatSearch() {
                   {msg.from === 'ai' && (
                     <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center mr-3 flex-shrink-0 text-sm font-bold">AI</div>
                   )}
-                  <div className={`max-w-2xl px-4 py-3 rounded-2xl ${
-                    msg.from === 'user' ? 'bg-orange-500 text-white rounded-br-sm' :
+                  <div className={`max-w-2xl px-4 py-3 rounded-2xl ${msg.from === 'user' ? 'bg-orange-500 text-white rounded-br-sm' :
                     msg.from === 'ai' ? 'bg-gray-100 text-gray-900 rounded-bl-sm' :
-                    'bg-yellow-50 text-yellow-900 text-sm border border-yellow-200'
-                  }`}>
+                      'bg-yellow-50 text-yellow-900 text-sm border border-yellow-200'
+                    }`}>
                     {msg.text}
                   </div>
                   {msg.from === 'user' && (
@@ -806,8 +836,8 @@ export default function ChatSearch() {
                     Describe your apartment needs including budget, location, size, and amenities. For example: &quot;2 bedroom apartment near ELTE university under 150,000 HUF&quot;
                   </div>
                 </div>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full font-medium transition disabled:opacity-50 min-h-[44px] flex-shrink-0"
                   disabled={loading || !query.trim()}
                   aria-label={loading ? "Searching for apartments" : "Search for apartments"}
@@ -840,8 +870,8 @@ export default function ChatSearch() {
 
               <div className="mb-4 flex items-center gap-4">
                 <span className="text-sm font-medium text-gray-700">Sort by:</span>
-                <select 
-                  value={sortBy} 
+                <select
+                  value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
                 >
@@ -933,6 +963,9 @@ export default function ChatSearch() {
                         )}
                         <div className={`absolute top-3 right-3 ${scoreColor} text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg`}>
                           {userScore}% Match
+                        </div>
+                        <div className="absolute top-3 left-3 z-10" onClick={(e) => e.preventDefault()}>
+                          <SaveApartmentButton apartmentId={apt.id} />
                         </div>
                       </a>
 
@@ -1034,35 +1067,34 @@ export default function ChatSearch() {
                   >
                     ← Previous
                   </button>
-                  
+
                   <div className="flex gap-1">
                     {Array.from({ length: Math.ceil(currentResults.length / resultsPerPage) }, (_, i) => i + 1)
                       .filter(page => {
                         const totalPages = Math.ceil(currentResults.length / resultsPerPage);
                         // Show first page, last page, current page, and pages around current
-                        return page === 1 || 
-                               page === totalPages || 
-                               (page >= currentPage - 1 && page <= currentPage + 1);
+                        return page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1);
                       })
                       .map((page, index, arr) => (
-                          <Fragment key={page}>
+                        <Fragment key={page}>
                           {index > 0 && arr[index - 1] !== page - 1 && (
                             <span className="px-2 py-2 text-gray-500">...</span>
                           )}
                           <button
                             onClick={() => setCurrentPage(page)}
-                            className={`px-4 py-3 rounded-lg transition min-h-[44px] ${
-                              currentPage === page 
-                                ? 'bg-orange-500 text-white' 
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            }`}
+                            className={`px-4 py-3 rounded-lg transition min-h-[44px] ${currentPage === page
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                              }`}
                           >
                             {page}
                           </button>
-                          </Fragment>
+                        </Fragment>
                       ))}
                   </div>
-                  
+
                   <button
                     onClick={() => setCurrentPage(Math.min(Math.ceil(currentResults.length / resultsPerPage), currentPage + 1))}
                     disabled={currentPage === Math.ceil(currentResults.length / resultsPerPage)}
@@ -1076,9 +1108,9 @@ export default function ChatSearch() {
           </div>
 
           {/* Chat Panel - Fixed at bottom */}
-          <div 
+          <div
             className="bg-white border-t shadow-2xl flex-shrink-0 transition-all duration-300"
-            style={{ 
+            style={{
               maxHeight: chatExpanded ? '550px' : '120px',
             }}
             onMouseEnter={() => !chatExpanded && setChatHovered(true)}

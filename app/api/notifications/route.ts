@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send notification immediately
-  const success = await sendNotification(data.user_id, data.type, finalTitle, finalMessage, data.template_data);
+    const success = await sendNotification(data.user_id, data.type, finalTitle, finalMessage, data.template_data);
 
     if (success) {
       // Log the notification
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
       query = query.is('read_at', null);
     }
 
-  const { data: notifications, error } = await query.limit(50);
+    const { data: notifications, error } = await query.limit(50);
 
     if (error) {
       console.error('Error fetching notifications:', error);
@@ -291,7 +291,11 @@ async function sendEmailNotification(email: string, subject: string, message: st
       tags: [{ name: 'source', value: 'api' }],
     });
 
-    console.log(`📧 Email queued for ${email}: job ${job.id}`);
+    if (job) {
+      console.log(`📧 Email queued for ${email}: job ${job.id}`);
+    } else {
+      console.warn(`⚠️ Email queue not available, skipped email to ${email}`);
+    }
   } catch (error) {
     console.error('Error queuing email:', error);
     throw error;

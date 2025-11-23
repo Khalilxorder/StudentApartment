@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabaseClient';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
@@ -99,13 +99,12 @@ export default async function OwnerBookings() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        booking.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        booking.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          booking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              booking.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                                'bg-blue-100 text-blue-800'
+                        }`}>
                         {booking.status}
                       </span>
                     </td>

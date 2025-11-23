@@ -1,18 +1,6 @@
 // Using REST API directly to avoid SDK compatibility issues
+const API_KEY = process.env.GOOGLE_AI_API_KEY || '';
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-// Import circuit breaker for Gemini resilience
-import { getGeminiCircuitBreaker } from '../lib/circuit-breaker';
-
-// Get API key lazily to ensure env vars are loaded
-function getApiKey(): string {
-  const key = process.env.GOOGLE_AI_API_KEY;
-  if (!key) {
-    console.error('❌ GOOGLE_AI_API_KEY environment variable is not set!');
-    console.log('📍 Current env vars:', Object.keys(process.env).filter(k => k.includes('GOOGLE')));
-  }
-  return key || '';
-}
 
 // Simple in-memory cache for AI scoring results
 const scoringCache = new Map<string, { result: any; timestamp: number }>();
@@ -20,32 +8,6 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 
 // Request deduplication to prevent duplicate parallel requests
 const pendingRequests = new Map<string, Promise<any>>();
-
-// Timeout configurations - Increased for better reliability
-const DEFAULT_TIMEOUT_MS = 60000; // 60 seconds (increased from 30)
-const EMBEDDING_TIMEOUT_MS = 30000; // 30 seconds for embeddings (increased from 15)
-
-/**
- * Execute with timeout and circuit breaker protection
- */
-async function executeWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
-): Promise<T> {
-  const breaker = getGeminiCircuitBreaker();
-  
-  return breaker.execute(async () => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`[AI_TIMEOUT] Operation timed out after ${timeoutMs}ms`)),
-          timeoutMs
-        )
-      ),
-    ]);
-  });
-}
 
 // Generate a simple hash for user profile to create cache keys
 function hashUserProfile(userProfile: any): string {
@@ -58,16 +20,15 @@ function hashUserProfile(userProfile: any): string {
   return Buffer.from(key).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
 }
 
-// Models available - FIXED: Using gemini-2.5-flash (fastest and most capable)
-// Note: Available models verified on November 2, 2025
+// Models available - Using gemini-2.5-flash-lite (Gemini Flash 2.5 Lite)
 export const MODELS = {
-  TEXT: 'gemini-2.5-flash', // Fastest and most capable Flash model
-  FLASH: 'gemini-2.5-flash', // Fastest and most capable Flash model
-  FLASH_PREVIEW: 'gemini-2.5-flash', // Fastest and most capable Flash model
-  PRO: 'gemini-2.5-pro' // Pro model for complex queries
+  TEXT: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
+  FLASH: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
+  FLASH_PREVIEW: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
+  PRO: 'gemini-2.5-flash-lite' // Gemini Flash 2.5 Lite
 } as const;
 
-// Generate response from text prompt using REST API with parallel failover + circuit breaker
+// Generate response from text prompt using REST API with parallel failover
 export async function generateTextResponse(prompt: string, context?: string): Promise<string> {
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
   
@@ -80,40 +41,36 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     return pendingRequests.get(requestHash)!;
   }
   
-  // FIXED: Use working Gemini models (verified November 2, 2025)
+  // Try different models in order of preference (using Gemini Flash with fallbacks)
   const modelsToTry = [
-    'gemini-2.5-flash',      // Primary: Fastest and most capable
-    'gemini-2.0-flash-exp',  // Fallback: Experimental 2.0
-    'gemini-2.0-flash',      // Fallback: Stable 2.0
+    'gemini-1.5-flash', // Standard Flash 1.5 - better quota limits
+    'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite (fallback)
   ];
 
   const makeRequest = async (): Promise<string> => {
     // Try all models in parallel for fastest response (race condition)
     const parallelAttempts = modelsToTry.slice(0, 2).map(async (modelName) => {
       try {
-        const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
+        const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
         
         console.log(`🤖 Server: Analyzing story with ${modelName}...`);
-        const response = await executeWithTimeout(
-          fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: fullPrompt }]
-              }],
-              generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 8192,
-              }
-            })
-          }),
-          DEFAULT_TIMEOUT_MS
-        );
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: fullPrompt }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            }
+          })
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -144,28 +101,25 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
       // Sequential fallback with remaining models
       for (const modelName of modelsToTry.slice(2)) {
         try {
-          const url = `${API_URL}/${modelName}:generateContent?key=${getApiKey()}`;
+          const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
           
-          const response = await executeWithTimeout(
-            fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{ text: fullPrompt }]
-                }],
-                generationConfig: {
-                  temperature: 0.7,
-                  topK: 40,
-                  topP: 0.95,
-                  maxOutputTokens: 8192,
-                }
-              })
-            }),
-            DEFAULT_TIMEOUT_MS
-          );
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: fullPrompt }]
+              }],
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            })
+          });
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -185,12 +139,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
             console.log(`✅ Success with fallback model: ${modelName}`);
             return text;
           }
-        } catch (error: any) {
-          const errorMsg = error?.message || String(error);
-          if (errorMsg.includes('[AI_TIMEOUT]') || errorMsg.includes('Circuit')) {
-            console.error(`❌ Timeout or circuit breaker triggered for ${modelName}`);
-            throw error; // Re-throw timeouts to avoid silent failures
-          }
+        } catch (error) {
           console.log(`⚠️ Error with ${modelName}:`, error);
           continue;
         }

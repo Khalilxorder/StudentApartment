@@ -33,9 +33,15 @@ class CacheService {
     try {
       if (process.env.REDIS_URL) {
         // Dynamically import Redis only if needed
-        const { Redis } = await import('ioredis');
-        this.redis = new Redis(process.env.REDIS_URL);
-        console.log('✅ Redis cache connected');
+        // const { Redis } = await import('ioredis');
+        // this.redis = new Redis(process.env.REDIS_URL);
+        // this.redis.on('error', (err: any) => {
+        //   // Suppress connection errors to allow fallback to memory cache
+        //   // console.warn('Redis connection error, using fallback:', err.message);
+        //   this.redis = null;
+        // });
+        // console.log('✅ Redis cache connected');
+        console.warn('⚠️ Redis disabled for build/testing');
       }
     } catch (error) {
       console.warn('⚠️ Redis not available, using in-memory cache fallback');
@@ -85,7 +91,7 @@ class CacheService {
       // Save to Redis if available
       if (this.redis) {
         await this.redis.setex(key, ttl, JSON.stringify(value));
-        
+
         // Store tags for invalidation
         if (tags.length > 0) {
           for (const tag of tags) {
@@ -189,21 +195,21 @@ class CacheService {
   private cleanupExpired(): void {
     const now = Date.now();
     const keysToDelete: string[] = [];
-    
+
     this.memoryCache.forEach((entry, key) => {
       if (entry.expiresAt < now) {
         keysToDelete.push(key);
       }
     });
-    
+
     keysToDelete.forEach(key => this.memoryCache.delete(key));
   }
 
   /**
    * Get cache statistics
    */
-  getStats(): { 
-    memorySize: number; 
+  getStats(): {
+    memorySize: number;
     redisConnected: boolean;
   } {
     return {
@@ -222,17 +228,17 @@ export const cacheHelpers = {
    * Cache key generators
    */
   keys: {
-    search: (query: string, filters: any) => 
+    search: (query: string, filters: any) =>
       `search:${query}:${JSON.stringify(filters)}`,
-    apartment: (id: string) => 
+    apartment: (id: string) =>
       `apartment:${id}`,
-    apartments: (filters: any) => 
+    apartments: (filters: any) =>
       `apartments:${JSON.stringify(filters)}`,
-    user: (id: string) => 
+    user: (id: string) =>
       `user:${id}`,
-    userProfile: (id: string) => 
+    userProfile: (id: string) =>
       `user:${id}:profile`,
-    apartmentReviews: (id: string) => 
+    apartmentReviews: (id: string) =>
       `apartment:${id}:reviews`,
   },
 

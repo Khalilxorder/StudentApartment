@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, Fragment, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 import { Combobox, ComboboxInput, ComboboxOptions, ComboboxOption, Transition } from '@headlessui/react';
+import { getMapsConfig } from '@/lib/maps/config';
 
 const containerStyle = {
   width: '100%',
@@ -27,17 +28,8 @@ export default function Map({
   initialCoordinates?: Coordinates | null;
   onAddressSelect?: (address: string) => void;
 }) {
-  const mapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
-  
-  // Runtime validation for Maps API key
-  if (!mapsApiKey) {
-    console.error(
-      'MISSING REQUIRED ENV VAR: NEXT_PUBLIC_MAPS_API_KEY\n' +
-      'Please add it to your .env.local file:\n' +
-      'NEXT_PUBLIC_MAPS_API_KEY=your-google-maps-api-key\n' +
-      'Get it from: https://console.cloud.google.com/apis/credentials'
-    );
-  }
+  const mapsConfig = getMapsConfig({ requireApiKey: false });
+  const mapsApiKey = mapsConfig.apiKey;
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -202,7 +194,7 @@ function PlacesAutocomplete({
 
   const handleSelect = (address: string | null) => {
     if (!address) return;
-    
+
     setValue(address);
     setSuggestions([]);
     onAddressSelect?.(address);
@@ -232,8 +224,7 @@ function PlacesAutocomplete({
               <ComboboxOption
                 key={placeId}
                 className={({ active }) =>
-                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                    active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                  `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
                   }`
                 }
                 value={description}
@@ -259,5 +250,3 @@ function PlacesAutocomplete({
     </div>
   );
 }
-
-

@@ -1,19 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/utils/supabaseClient';
 import { sanitizeUserInput } from '@/lib/sanitize';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState({
     full_name: '',
+    avatarUrl: '',
     phone: '',
     bio: '',
     occupation: '',
@@ -31,6 +35,7 @@ export default function ProfilePage() {
     confirmPassword: '',
   });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
 
   const loadProfile = useCallback(async () => {
     try {
@@ -39,7 +44,7 @@ export default function ProfilePage() {
         router.push('/login');
         return;
       }
-      
+
       setUser(authUser);
 
       const { data: profileData } = await supabase
@@ -51,6 +56,7 @@ export default function ProfilePage() {
       if (profileData) {
         setProfile({
           full_name: profileData.full_name || '',
+          avatarUrl: profileData.avatar_url || authUser.user_metadata?.avatar_url || '',
           phone: profileData.phone || '',
           bio: profileData.bio || '',
           occupation: profileData.occupation || '',
@@ -62,6 +68,13 @@ export default function ProfilePage() {
             smokingHabits: '',
           },
         });
+      } else {
+        // Fallback to metadata if no profile record
+        setProfile(prev => ({
+          ...prev,
+          full_name: authUser.user_metadata?.full_name || '',
+          avatarUrl: authUser.user_metadata?.avatar_url || '',
+        }));
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -74,6 +87,58 @@ export default function ProfilePage() {
     loadProfile();
   }, [loadProfile]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    setUploadingAvatar(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'avatar');
+      formData.append('userId', user.id);
+
+      const response = await fetch('/api/media/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      const newAvatarUrl = data.url;
+
+      // Update state
+      setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
+      setAvatarTimestamp(Date.now()); // Force image refresh
+
+      // Update user metadata
+      await supabase.auth.updateUser({
+        data: { avatar_url: newAvatarUrl }
+      });
+
+      // Update profile table
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          avatar_url: newAvatarUrl,
+          updated_at: new Date().toISOString(),
+        });
+
+      alert('Profile picture updated successfully!');
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      alert('Error uploading avatar: ' + error.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -85,6 +150,7 @@ export default function ProfilePage() {
           id: user.id,
           email: user.email,
           full_name: sanitizeUserInput(profile.full_name, false),
+          avatar_url: profile.avatarUrl,
           phone: sanitizeUserInput(profile.phone, false),
           bio: sanitizeUserInput(profile.bio, false),
           university: sanitizeUserInput(profile.university, false),
@@ -94,6 +160,14 @@ export default function ProfilePage() {
         });
 
       if (error) throw error;
+
+      // Also update auth metadata for consistency
+      await supabase.auth.updateUser({
+        data: {
+          full_name: profile.full_name,
+          // avatar_url is already updated in handleAvatarUpload but good to keep in sync
+        }
+      });
 
       alert('Profile updated successfully!');
     } catch (error: any) {
@@ -157,12 +231,7 @@ export default function ProfilePage() {
             <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
             <p className="text-gray-600 mt-2">Manage your personal information</p>
           </div>
-          <Link
-            href="/dashboard"
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition"
-          >
-            ← Back to Dashboard
-          </Link>
+
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -171,11 +240,48 @@ export default function ProfilePage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="text-center">
                 {/* Avatar */}
-                <div className="w-24 h-24 bg-yellow-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-3xl font-bold text-yellow-600">
-                    {profile.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
+                <div
+                  className="relative w-24 h-24 mx-auto mb-4 group cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-yellow-100 flex items-center justify-center border-2 border-transparent group-hover:border-yellow-400 transition-colors">
+                    {profile.avatarUrl ? (
+                      <Image
+                        src={`${profile.avatarUrl}${profile.avatarUrl.includes('?') ? '&' : '?'}t=${avatarTimestamp}`}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                      />
+                    ) : (
+                      <span className="text-3xl font-bold text-yellow-600">
+                        {profile.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-xs font-medium">Change</span>
+                  </div>
+
+                  {/* Loading State */}
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 bg-white/80 rounded-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
+                    </div>
+                  )}
                 </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
+
                 <h2 className="text-xl font-semibold text-gray-900">
                   {profile.full_name || 'User'}
                 </h2>
@@ -193,62 +299,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Personality Assessment Connection */}
-            <div className="mt-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">🎯 Personality Assessment</h3>
-              <p className="text-xs text-gray-600 mb-3">
-                Connect your personality profile for better apartment recommendations
-              </p>
-              
-              {/* Show current assessment status */}
-              {(() => {
-                // Check if assessment exists (in a real app, this would be fetched)
-                const hasAssessment = false; // This would be checked from state/API
-                return hasAssessment ? (
-                  <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
-                    <p className="text-xs text-green-800 font-medium">✓ Connected</p>
-                    <p className="text-xs text-green-600">Archetype: Creative Explorer</p>
-                  </div>
-                ) : null;
-              })()}
 
-              <button 
-                onClick={async () => {
-                  try {
-                    const { openPersonalityAssessmentPopup, getPersonalityAssessment } = await import('@/utils/personality-assessment');
-                    
-                    // Check if already connected
-                    const existing = await getPersonalityAssessment(user.id);
-                    if (existing) {
-                      alert(`Already connected! Your archetype: ${existing.archetype || 'Balanced Individual'}`);
-                      return;
-                    }
-
-                    // For demo purposes, simulate successful connection
-                    // In production, this would open the popup
-                    alert('In production, this would open the SELF ASSESSMENT BATTERY website in a popup. For demo purposes, we\'ll simulate a successful connection.');
-                    
-                    // Simulate assessment completion
-                    const mockAssessment = {
-                      archetype: 'Creative Explorer',
-                      traits: { openness: 0.8, conscientiousness: 0.5, extraversion: 0.6, agreeableness: 0.7, neuroticism: 0.3 }
-                    };
-                    
-                    alert(`Personality assessment completed! Your archetype: ${mockAssessment.archetype}`);
-                    
-                  } catch (err) {
-                    console.error('Personality assessment error:', err);
-                    alert('Connection failed. Please try again.');
-                  }
-                }}
-                className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium rounded-lg transition"
-              >
-                Take Assessment
-              </button>
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                Uses SELF ASSESSMENT BATTERY
-              </p>
-            </div>
 
             {/* Tips */}
             <div className="mt-6 bg-yellow-50 rounded-lg border border-yellow-200 p-4">
@@ -328,6 +379,8 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+
+
 
               {/* Student Information */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

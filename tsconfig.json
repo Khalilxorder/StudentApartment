@@ -20,8 +20,12 @@
     "downlevelIteration": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@components/*": ["components/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@components/*": [
+        "components/*"
+      ]
     },
     "plugins": [
       {
@@ -50,6 +54,7 @@
     "backup_current_broken_ui",
     "mobile-app",
     ".next",
-    ".github"
+    ".github",
+    "Owner listing"
   ]
 }

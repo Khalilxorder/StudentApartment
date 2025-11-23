@@ -140,6 +140,10 @@ export class NotificationService {
         ],
       });
 
+      if (!job || !job.id) {
+        return { success: false, channel: 'email', error: 'Failed to queue email' };
+      }
+
       return { success: true, channel: 'email', messageId: `job_${job.id}` };
     } catch (error) {
       return {

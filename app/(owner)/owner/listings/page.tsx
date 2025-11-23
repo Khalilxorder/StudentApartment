@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabaseClient';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -30,7 +30,7 @@ export default async function OwnerListings() {
               </Link>
               <h1 className="text-2xl font-bold text-gray-900">My Listings</h1>
             </div>
-            <Link 
+            <Link
               href="/owner/listings/create"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
             >
@@ -43,7 +43,7 @@ export default async function OwnerListings() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {apartments && apartments.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {apartments.map((apartment: any) => (
+            {apartments.map((apartment) => (
               <div key={apartment.id} className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden">
                 {/* Image */}
                 {apartment.image_urls && apartment.image_urls.length > 0 && (
@@ -72,7 +72,7 @@ export default async function OwnerListings() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {apartment.title}
                   </h3>
-                  
+
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
                     <span>📍 District {apartment.district}</span>
                     <span>•</span>

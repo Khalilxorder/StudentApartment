@@ -104,7 +104,7 @@ function scoreLocationMatch(apartment: Apartment, query: SearchQuery): number {
   if (query.location.near && apartment.address) {
     const addressLower = apartment.address.toLowerCase();
     const nearLower = query.location.near.toLowerCase();
-    
+
     if (addressLower.includes(nearLower)) {
       score = Math.max(score, 90);
     }
@@ -172,7 +172,7 @@ function scoreAmenitiesMatch(apartment: Apartment, query: SearchQuery): number {
   query.requirements.forEach((req) => {
     // Example: check if apartment has the required feature
     // This would need to be connected to actual apartment data
-    if (req === 'furnished' && apartment.furnishing === 'furnished') {
+    if (req === 'furnished' && apartment.amenities?.some(a => a.toLowerCase() === 'furnished')) {
       matchCount++;
     }
     // Add more checks as needed
@@ -220,13 +220,14 @@ function generateExplanation(
   }
 
   // Elevator consideration
-  if (apartment.elevator === 'no' && apartment.bedrooms && apartment.bedrooms > 2) {
+  // Elevator consideration
+  if (!apartment.amenities?.some(a => a.toLowerCase().includes('elevator')) && apartment.bedrooms && apartment.bedrooms > 2) {
     cons.push('No elevator available');
   }
 
   // Furnishing
-  if (apartment.furnishing) {
-    pros.push(`${apartment.furnishing} apartment`);
+  if (apartment.amenities?.some(a => a.toLowerCase() === 'furnished')) {
+    pros.push(`Furnished apartment`);
   }
 
   const explanation =
@@ -245,10 +246,10 @@ export function rankApartments(
   query: SearchQuery
 ): ApartmentMatch[] {
   const scored = apartments.map((apt) => scoreApartment(apt, query));
-  
+
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
-  
+
   return scored;
 }
 

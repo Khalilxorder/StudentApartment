@@ -342,4 +342,4 @@ export async function securityMiddleware(req: NextRequest): Promise<NextResponse
 }
 
 // Utility functions for components
-export { generateCSRFToken, validateInput, VALIDATION_PATTERNS };
+export { generateCSRFToken, validateInput, VALIDATION_PATTERNS, storeCSRFToken };

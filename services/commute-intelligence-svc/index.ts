@@ -30,22 +30,17 @@ export interface University {
 }
 
 export class CommuteIntelligenceService {
-  private supabase: any = null;
+  private supabase: any;
   private gtfsData: any = null;
   private universities: University[] = [];
 
-  private getSupabase() {
-    if (!this.supabase) {
-      this.supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-    }
-    return this.supabase;
-  }
-
   constructor() {
-    // Lazy initialization - don't call getSupabase() or load data here
+    this.supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    this.loadGTFSData();
+    this.loadUniversities();
   }
 
   /**
@@ -81,7 +76,7 @@ export class CommuteIntelligenceService {
   private async loadUniversities() {
     try {
       // Load universities from database
-      const { data, error } = await this.getSupabase()
+      const { data, error } = await this.supabase
         .from('universities')
         .select('*');
 
@@ -294,7 +289,7 @@ export class CommuteIntelligenceService {
       console.log('Starting commute cache population...');
 
       // Get all apartments
-      const { data: apartments, error: aptError } = await this.getSupabase()
+      const { data: apartments, error: aptError } = await this.supabase
         .from('apartments')
         .select('id, latitude, longitude')
         .not('latitude', 'is', null)
@@ -351,7 +346,7 @@ export class CommuteIntelligenceService {
       for (let i = 0; i < cacheEntries.length; i += batchSize) {
         const batch = cacheEntries.slice(i, i + batchSize);
 
-        const { error: insertError } = await this.getSupabase()
+        const { error: insertError } = await this.supabase
           .from('commute_cache')
           .upsert(batch, {
             onConflict: 'apartment_id,university_id,mode',
@@ -379,7 +374,7 @@ export class CommuteIntelligenceService {
     mode: string = 'transit'
   ): Promise<CommuteResult | null> {
     try {
-      const { data, error } = await this.getSupabase()
+      const { data, error } = await this.supabase
         .from('commute_cache')
         .select('*')
         .eq('apartment_id', apartmentId)
@@ -417,7 +412,7 @@ export class CommuteIntelligenceService {
    */
   async updateApartmentCommuteCache(apartmentId: string): Promise<void> {
     try {
-      const { data: apartment, error } = await this.getSupabase()
+      const { data: apartment, error } = await this.supabase
         .from('apartments')
         .select('latitude, longitude')
         .eq('id', apartmentId)
@@ -456,7 +451,7 @@ export class CommuteIntelligenceService {
       }
 
       // Upsert cache entries
-      const { error: upsertError } = await this.getSupabase()
+      const { error: upsertError } = await this.supabase
         .from('commute_cache')
         .upsert(cacheEntries, {
           onConflict: 'apartment_id,university_id,mode',

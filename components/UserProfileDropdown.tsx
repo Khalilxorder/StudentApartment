@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/utils/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 import type { UserProfileSummary } from './UserAuthStatus';
@@ -62,11 +63,12 @@ export default function UserProfileDropdown({ user, profile }: UserProfileDropdo
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setIsOpen((open) => !open)}
-        className="flex items-center space-x-3 rounded-lg p-2 transition-colors duration-200 hover:bg-gray-100"
-      >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white">
+      <div className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-200 hover:bg-gray-100">
+        <Link
+          href="/dashboard/profile"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white hover:opacity-80 transition-opacity"
+          title="Go to Profile"
+        >
           {profile?.avatarUrl ? (
             <img
               src={profile.avatarUrl}
@@ -76,29 +78,34 @@ export default function UserProfileDropdown({ user, profile }: UserProfileDropdo
           ) : (
             displayName.charAt(0).toUpperCase()
           )}
-        </div>
-        <div className="hidden text-left md:block">
-          <div className="text-sm font-medium text-gray-900">{displayName}</div>
-          <div className="flex items-center space-x-1 text-xs text-gray-500">
-            <span>{roleIcon}</span>
-            <span>{roleLabel}</span>
-            {role === 'student' && profile?.university ? (
-              <>
-                <span aria-hidden="true">•</span>
-                <span>{profile.university}</span>
-              </>
-            ) : null}
-          </div>
-        </div>
-        <svg
-          className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        </Link>
+        <button
+          onClick={() => setIsOpen((open) => !open)}
+          className="flex items-center space-x-3 focus:outline-none"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <div className="hidden text-left md:block">
+            <div className="text-sm font-medium text-gray-900">{displayName}</div>
+            <div className="flex items-center space-x-1 text-xs text-gray-500">
+              <span>{roleIcon}</span>
+              <span>{roleLabel}</span>
+              {role === 'student' && profile?.university ? (
+                <>
+                  <span aria-hidden="true">•</span>
+                  <span>{profile.university}</span>
+                </>
+              ) : null}
+            </div>
+          </div>
+          <svg
+            className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
 
       {isOpen && (
         <>
@@ -106,7 +113,7 @@ export default function UserProfileDropdown({ user, profile }: UserProfileDropdo
           <div className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
             <div className="border-b border-gray-200 p-4">
               <div className="flex items-center space-x-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white">
+                <Link href="/dashboard/profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white hover:opacity-80 transition-opacity">
                   {profile?.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -116,7 +123,7 @@ export default function UserProfileDropdown({ user, profile }: UserProfileDropdo
                   ) : (
                     displayName.charAt(0).toUpperCase()
                   )}
-                </div>
+                </Link>
                 <div>
                   <div className="text-sm font-medium text-gray-900">{displayName}</div>
                   <div className="text-xs text-gray-500">{user.email}</div>

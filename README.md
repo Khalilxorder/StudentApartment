@@ -1,6 +1,29 @@
 # 🏢 Student Apartments - AI-Powered Housing Marketplace
 
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Khalilxorder/StudentApartment/ci.yml?branch=main)](https://github.com/Khalilxorder/StudentApartment/actions)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14.2-black)](https://nextjs.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
+
+**Status**: ✅ **PRODUCTION READY** as of November 7, 2025
+
 A Next.js 14 student housing marketplace platform with AI-powered search, semantic ranking, integrated payments, and comprehensive trust & safety features.
+
+## 📚 Documentation
+
+**Start here**: [docs/README.md](./docs/README.md) for quick start (5 minutes)
+
+### All Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[docs/README.md](./docs/README.md)** | Quick start & local setup |
+| **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** | Deploy to Vercel or self-hosted |
+| **[docs/SECURITY.md](./docs/SECURITY.md)** | Auth, CSRF, rate limiting, compliance |
+| **[docs/PLAYBOOK.md](./docs/PLAYBOOK.md)** | Operations, troubleshooting, incident response |
+| **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** | System design, data flows, tech stack |
+| **[FINAL_LAUNCH_CHECKLIST.md](./FINAL_LAUNCH_CHECKLIST.md)** | Pre-deployment verification (10 phases) |
+| **[FINALIZATION_SUMMARY.md](./FINALIZATION_SUMMARY.md)** | Project completion & handoff |
 
 ## 🌟 Key Features
 
@@ -48,6 +71,7 @@ A Next.js 14 student housing marketplace platform with AI-powered search, semant
 - **Ranking**: Thompson Sampling (multi-armed bandit)
 
 ### Payments
+
 - **Payment Provider**: Stripe
 - **Integration**: Stripe Connect Express (for owner payouts)
 - **Webhooks**: Automated payment event handling
