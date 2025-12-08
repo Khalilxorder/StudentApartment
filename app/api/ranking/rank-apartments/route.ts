@@ -2,10 +2,56 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rankingService } from '@/services/ranking-svc';
 import { abTestingService } from '@/services/ab-test-svc';
 import { runQuery } from '@/lib/db/pool';
+import { logger } from '@/lib/logger';
+
+// Types for ranking
+interface ApartmentOwner {
+  verified: boolean;
+}
+
+interface ApartmentMetrics {
+  suggestedPrice?: number;
+  mediaQuality?: number;
+  completeness?: number;
+  commuteMinutes?: number;
+}
+
+interface SearchResultApartment {
+  id: string;
+  price: number;
+  rooms: number;
+  location: string;
+  address: string;
+  district: number;
+  amenities: string[];
+  owner: ApartmentOwner;
+  metrics?: ApartmentMetrics;
+}
+
+interface SearchResult {
+  apartment: SearchResultApartment;
+}
+
+interface DbMetrics {
+  id: string;
+  floor: number | null;
+  has_elevator: boolean | null;
+  furnished: boolean | null;
+  media_quality_score: number | null;
+  completeness_score: number | null;
+  suggested_price: number | null;
+  market_average: number | null;
+  favorite_count: number | null;
+  message_count: number | null;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { searchResults, userPreferences, userId } = await request.json();
+    const { searchResults, userPreferences, userId } = await request.json() as {
+      searchResults: SearchResult[];
+      userPreferences: Record<string, unknown>;
+      userId?: string;
+    };
 
     if (!searchResults || !userPreferences) {
       return NextResponse.json(
@@ -19,11 +65,11 @@ export async function POST(request: NextRequest) {
       ? await abTestingService.getUserVariant(userId, 'ranking_algorithm_v1')
       : null;
 
-    const apartmentIds: string[] = searchResults.map((result: any) => result.apartment.id);
+    const apartmentIds: string[] = searchResults.map((result: SearchResult) => result.apartment.id);
 
     const metricsQuery = apartmentIds.length
       ? await runQuery(
-          `
+        `
             SELECT
               a.id,
               a.floor,
@@ -55,19 +101,19 @@ export async function POST(request: NextRequest) {
             ) messages ON TRUE
             WHERE a.id = ANY($1::uuid[])
           `,
-          [apartmentIds],
-        )
+        [apartmentIds],
+      )
       : { rows: [] };
 
-    const metricsById = new Map<string, any>();
+    const metricsById = new Map<string, DbMetrics>();
     for (const row of metricsQuery.rows ?? []) {
       metricsById.set(row.id, row);
     }
 
     // Convert search results to apartment data format
-    const apartments = searchResults.map((result: any) => {
+    const apartments = searchResults.map((result: SearchResult) => {
       const id = result.apartment.id;
-      const metrics = metricsById.get(id) ?? {};
+      const metrics: Partial<DbMetrics> = metricsById.get(id) ?? {};
       const searchMetrics = result.apartment.metrics ?? {};
 
       const suggestedFromSearch = searchMetrics.suggestedPrice;
@@ -89,7 +135,7 @@ export async function POST(request: NextRequest) {
         rooms: result.apartment.rooms,
         location: result.apartment.location,
         address: result.apartment.address,
-        district: result.apartment.district,
+        district: String(result.apartment.district),
         amenities: result.apartment.amenities,
         verified: result.apartment.owner.verified,
         mediaScore: typeof searchMetrics.mediaQuality === 'number' ? searchMetrics.mediaQuality : metrics.media_quality_score ?? 0.6,
@@ -121,9 +167,8 @@ export async function POST(request: NextRequest) {
       experimentVariant: rankingVariant || 'baseline',
     };
 
-    // Format response
     const results = rankingResults.map(result => {
-      const apartment = searchResults.find((r: any) => r.apartment.id === result.apartmentId);
+      const apartment = searchResults.find((r: SearchResult) => r.apartment.id === result.apartmentId);
       return {
         ...apartment,
         rankingScore: result.score,
@@ -148,7 +193,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Ranking API error:', error);
+    logger.error({ error }, 'Ranking API error');
     return NextResponse.json(
       { error: 'Ranking failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

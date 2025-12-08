@@ -214,8 +214,17 @@ export default function ReviewSubmissionForm({
           formData.append('file', photos[i].file);
           formData.append('caption', photos[i].caption || '');
 
+          // Get CSRF token from cookies
+          const csrfToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrf_token='))
+            ?.split('=')[1];
+
           const response = await fetch('/api/reviews/upload-photo', {
             method: 'POST',
+            headers: {
+              'X-CSRF-Token': csrfToken || '',
+            },
             body: formData
           });
 
@@ -237,10 +246,17 @@ export default function ReviewSubmissionForm({
         photos: uploadedPhotoUrls
       };
 
+      // Get CSRF token from cookies
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_token='))
+        ?.split('=')[1];
+
       const response = await fetch('/api/reviews', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken || '',
         },
         body: JSON.stringify(reviewPayload)
       });
@@ -291,11 +307,10 @@ export default function ReviewSubmissionForm({
           className="focus:outline-none"
         >
           <Star
-            className={`w-6 h-6 ${
-              i < value
+            className={`w-6 h-6 ${i < value
                 ? 'fill-yellow-400 text-yellow-400'
                 : 'text-gray-300 hover:text-yellow-400'
-            } transition-colors`}
+              } transition-colors`}
           />
         </button>
       ))}

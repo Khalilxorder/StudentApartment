@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/viewings/[id]
@@ -58,7 +59,7 @@ export async function GET(
       booking,
     });
   } catch (error) {
-    console.error('Error fetching viewing booking:', error);
+    logger.error({ error, bookingId: params.id }, 'Error fetching viewing booking');
     return NextResponse.json(
       { error: 'Failed to fetch viewing booking' },
       { status: 500 }
@@ -128,7 +129,7 @@ export async function DELETE(
       message: 'Viewing booking cancelled successfully',
     });
   } catch (error) {
-    console.error('Error cancelling viewing booking:', error);
+    logger.error({ error, bookingId: params.id }, 'Error cancelling viewing booking');
     return NextResponse.json(
       { error: 'Failed to cancel viewing booking' },
       { status: 500 }

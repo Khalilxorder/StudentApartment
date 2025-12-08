@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +13,8 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const documentType = (formData as any).get('documentType') as string;
-    const file = (formData as any).get('file') as File;
+    const documentType = formData.get('documentType') as string | null;
+    const file = formData.get('file') as File | null;
 
     if (!file || !documentType) {
       return NextResponse.json({ error: 'Missing file or document type' }, { status: 400 });
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      logger.error({ uploadError, userId: user.id }, 'Verification upload failed');
       return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 });
     }
 
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      console.error('Database insert error:', insertError);
+      logger.error({ insertError, userId: user.id }, 'Verification DB insert failed');
       // Clean up uploaded file if database insert fails
       await supabase.storage.from('documents').remove([fileName]);
       return NextResponse.json({ error: 'Failed to save verification record' }, { status: 500 });
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
       .eq('document_url', publicUrl);
 
     if (analysisUpdateError) {
-      console.error('AI analysis update error:', analysisUpdateError);
+      logger.error({ analysisUpdateError, userId: user.id }, 'AI analysis update failed');
     }
 
     // Update user profile based on AI analysis
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id);
 
       if (profileUpdateError) {
-        console.error('Profile update error:', profileUpdateError);
+        logger.error({ profileUpdateError, userId: user.id }, 'Profile update failed');
       }
     }
 
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Verification upload error:', error);
+    logger.error({ error }, 'Verification upload error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest) {
       .order('submitted_at', { ascending: false });
 
     if (error) {
-      console.error('Database query error:', error);
+      logger.error({ error, userId: user.id }, 'Verification query failed');
       return NextResponse.json({ error: 'Failed to fetch verification status' }, { status: 500 });
     }
 
@@ -162,7 +163,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Verification status error:', error);
+    logger.error({ error }, 'Verification status error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -209,8 +210,32 @@ async function performAIDocumentAnalysis(
   userId: string
 ) {
   // Dynamically import the AI service to avoid static build-time type/import issues
-  const verificationModule = await import('@/services/verification-svc');
-  const AIDocumentVerificationService = (verificationModule as any).AIDocumentVerificationService || (verificationModule as any).default;
+  interface VerificationModule {
+    AIDocumentVerificationService?: new () => {
+      analyzeDocument: (url: string, type: string, context?: { expectedName?: string; expectedCountry?: string; userId: string }) => Promise<{
+        isValid: boolean;
+        confidence: number;
+        issues: string[];
+        recommendations: string[];
+      }>;
+    };
+    default?: new () => {
+      analyzeDocument: (url: string, type: string, context?: { expectedName?: string; expectedCountry?: string; userId: string }) => Promise<{
+        isValid: boolean;
+        confidence: number;
+        issues: string[];
+        recommendations: string[];
+      }>;
+    };
+  }
+
+  const verificationModule: VerificationModule = await import('@/services/verification-svc');
+  const AIDocumentVerificationService = verificationModule.AIDocumentVerificationService || verificationModule.default;
+
+  if (!AIDocumentVerificationService) {
+    throw new Error('AIDocumentVerificationService not found in verification-svc module');
+  }
+
   const aiService = new AIDocumentVerificationService();
 
   // Get user context for cross-validation

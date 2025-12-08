@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabaseClient';
 
@@ -23,7 +25,7 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching users:', error);
+      logger.error({ err: error }, 'Error fetching users:');
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
@@ -35,7 +37,7 @@ export async function GET() {
 
     return NextResponse.json({ users: transformedUsers });
   } catch (error) {
-    console.error('Error in admin users API:', error);
+    logger.error({ err: error }, 'Error in admin users API:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -55,7 +57,7 @@ export async function PATCH(request: NextRequest) {
       .eq('user_id', userId);
 
     if (profileError) {
-      console.error('Error updating user profile:', profileError);
+      logger.error({ err: profileError }, 'Error updating user profile:');
       return NextResponse.json({ error: 'Failed to update user profile' }, { status: 500 });
     }
 
@@ -73,7 +75,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in admin users PATCH:', error);
+    logger.error({ err: error }, 'Error in admin users PATCH:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

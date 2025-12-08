@@ -5,6 +5,8 @@ import { searchService } from '@/services/search-svc';
 import { z } from 'zod';
 import { rankingService } from '@/services/ranking-svc';
 import { personalizationService } from '@/services/personalization-svc';
+import { logger } from '@/lib/logger';
+import { getCachedSearchResults, setCachedSearchResults, createSearchQueryHash } from '@/lib/cache/strategies';
 
 // Optional telemetry integration (PostHog)
 const POSTHOG_INGEST_URL = process.env.POSTHOG_INGEST_URL || 'https://app.posthog.com/capture';
@@ -50,6 +52,85 @@ function getPerformanceMetrics() {
   };
 }
 
+/**
+ * @swagger
+ * /api/search:
+ *   post:
+ *     summary: Search for apartments
+ *     description: Hybrid search combining semantic search, structured filters, and ranking
+ *     tags: [Search]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: Search query (e.g., "modern apartment near university")
+ *                 example: "2 bedroom apartment with WiFi"
+ *               filters:
+ *                 type: object
+ *                 properties:
+ *                   priceMin:
+ *                     type: number
+ *                     example: 100000
+ *                   priceMax:
+ *                     type: number
+ *                     example: 200000
+ *                   bedrooms:
+ *                     type: number
+ *                     example: 2
+ *                   district:
+ *                     type: string
+ *                     example: "7"
+ *                   amenities:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     example: ["WiFi", "Parking"]
+ *               sortBy:
+ *                 type: string
+ *                 enum: [relevance, price_asc, price_desc, distance, newest]
+ *                 default: relevance
+ *               limit:
+ *                 type: number
+ *                 minimum: 1
+ *                 maximum: 100
+ *                 default: 20
+ *               offset:
+ *                 type: number
+ *                 minimum: 0
+ *                 default: 0
+ *     responses:
+ *       200:
+ *         description: Search results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 apartments:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Apartment'
+ *                 total:
+ *                   type: number
+ *                 offset:
+ *                   type: number
+ *                 limit:
+ *                   type: number
+ *       400:
+ *         description: Invalid search parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ */
+
 // Search request validation schema
 const searchRequestSchema = z.object({
   query: z.string().optional(),
@@ -94,6 +175,14 @@ export async function POST(request: NextRequest) {
       userId,
     } = validatedData;
 
+    // Check cache first
+    const queryHash = createSearchQueryHash(validatedData);
+    const cachedResults = await getCachedSearchResults(queryHash);
+    if (cachedResults) {
+      logger.info({ queryHash }, 'Search cache hit');
+      return NextResponse.json(cachedResults);
+    }
+
     // Convert API filters to search service format
     const searchFilters = {
       budget: filters.priceMin || filters.priceMax ? {
@@ -110,7 +199,7 @@ export async function POST(request: NextRequest) {
       } : undefined,
       university: filters.university,
       maxCommute: filters.maxCommuteMinutes,
-      sortBy: sortBy as any,
+      sortBy: sortBy as 'relevance' | 'price_asc' | 'price_desc' | 'distance' | 'newest',
       limit,
       offset,
     };
@@ -145,18 +234,18 @@ export async function POST(request: NextRequest) {
     const latency = Date.now() - startTime;
     updatePerformanceMetrics(latency);
 
-      // Send telemetry if configured (non-blocking but awaited to ensure delivery in dev)
-      try {
-        await emitSearchTelemetryIfNeeded();
-      } catch (err) {
-        // Telemetry failure should not break the API
-        console.warn('Telemetry send failed:', err);
-      }
+    // Send telemetry if configured (non-blocking but awaited to ensure delivery in dev)
+    try {
+      await emitSearchTelemetryIfNeeded();
+    } catch (err) {
+      // Telemetry failure should not break the API
+      logger.warn({ err }, 'Telemetry send failed');
+    }
 
     // Check p95 latency requirement (250ms)
     const metrics = getPerformanceMetrics();
     if (metrics.p95Latency > 250) {
-      console.warn(`Search API p95 latency exceeded: ${metrics.p95Latency}ms (target: 250ms)`);
+      logger.warn({ p95: metrics.p95Latency, target: 250 }, 'Search API p95 latency exceeded');
     }
 
     return NextResponse.json({
@@ -176,7 +265,7 @@ export async function POST(request: NextRequest) {
     const latency = Date.now() - startTime;
     updatePerformanceMetrics(latency);
 
-    console.error('Search API error:', error);
+    logger.error({ error }, 'Search API error');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -206,7 +295,7 @@ async function sendPostHogEvent(event: string, properties: Record<string, unknow
     });
   } catch (error) {
     // swallow errors - telemetry must not affect core API
-    console.warn('PostHog telemetry error:', error);
+    logger.warn({ error }, 'PostHog telemetry error');
   }
 }
 

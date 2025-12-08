@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { cicdPipelineService, DeploymentMetrics } from '@/services/cicd-pipeline-svc';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
       status: metrics.status === 'success' ? 200 : 500,
     });
   } catch (error) {
-    console.error('Deployment error:', error);
+    logger.error({ err: error }, 'Deployment error:');
     return NextResponse.json(
       { error: 'Deployment failed', message: String(error) },
       { status: 500 }
@@ -78,7 +80,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(metrics);
   } catch (error) {
-    console.error('Error fetching deployment:', error);
+    logger.error({ err: error }, 'Error fetching deployment:');
     return NextResponse.json(
       { error: 'Failed to fetch deployment' },
       { status: 500 }
@@ -120,7 +122,7 @@ export async function DELETE(req: NextRequest) {
       status: result.success ? 200 : 500,
     });
   } catch (error) {
-    console.error('Rollback error:', error);
+    logger.error({ err: error }, 'Rollback error:');
     return NextResponse.json(
       { error: 'Rollback failed', message: String(error) },
       { status: 500 }

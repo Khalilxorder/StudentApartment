@@ -1,9 +1,11 @@
+import { logger } from '@/lib/dev-logger';
+
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2023-10-16' as any,
+  apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
 });
 
 const supabaseAdmin = createClient(
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
       created_at: account.created,
     });
   } catch (error: any) {
-    console.error('Error fetching account status:', error);
+    logger.error({ err: error }, 'Error fetching account status:');
     return NextResponse.json(
       {
         success: false,

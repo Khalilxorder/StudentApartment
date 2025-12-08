@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 import { getStripe } from '@/lib/stripe/server';
+import { logger } from '@/lib/logger';
 
 interface ConnectAccountRequest {
   userId: string;
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      console.error('Failed to store Stripe account:', insertError);
+      logger.error({ insertError, userId }, 'Failed to store Stripe account');
       return NextResponse.json(
         { error: 'Failed to create account record' },
         { status: 500 }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating Stripe Connect account:', error);
+    logger.error({ error }, 'Error creating Stripe Connect account');
     return NextResponse.json(
       { error: 'Failed to create Stripe Connect account' },
       { status: 500 }
@@ -160,7 +161,7 @@ export async function GET(
       account: updated,
     });
   } catch (error) {
-    console.error('Error retrieving Stripe Connect account:', error);
+    logger.error({ error }, 'Error retrieving Stripe Connect account');
     return NextResponse.json(
       { error: 'Failed to retrieve account status' },
       { status: 500 }

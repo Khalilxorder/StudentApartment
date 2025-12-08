@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { securityLogger } from '@/lib/security-logger';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(stats);
   } catch (error) {
-    console.error('Failed to fetch security stats:', error);
+    logger.error({ error }, 'Failed to fetch security stats');
     return NextResponse.json(
       { error: 'Failed to fetch security statistics' },
       { status: 500 }

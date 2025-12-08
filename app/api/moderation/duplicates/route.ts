@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error detecting duplicates:', error);
+    logger.error({ err: error }, 'Error detecting duplicates:');
     return NextResponse.json(
       { error: 'Failed to detect duplicates' },
       { status: 500 }
@@ -164,7 +166,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      console.error('Error storing duplicate relationship:', insertError);
+      logger.error({ err: insertError }, 'Error storing duplicate relationship:');
       return NextResponse.json(
         { error: 'Failed to store duplicate relationship' },
         { status: 500 }
@@ -194,7 +196,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error marking duplicate:', error);
+    logger.error({ err: error }, 'Error marking duplicate:');
     return NextResponse.json(
       { error: 'Failed to mark duplicate' },
       { status: 500 }
@@ -274,7 +276,7 @@ export async function DELETE(request: NextRequest) {
       .eq('duplicate_apartment_id', duplicateApartmentId);
 
     if (error) {
-      console.error('Error deleting duplicate relationship:', error);
+      logger.error({ err: error }, 'Error deleting duplicate relationship:');
       return NextResponse.json(
         { error: 'Failed to delete duplicate relationship' },
         { status: 500 }
@@ -287,7 +289,7 @@ export async function DELETE(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error deleting duplicate:', error);
+    logger.error({ err: error }, 'Error deleting duplicate:');
     return NextResponse.json(
       { error: 'Failed to delete duplicate' },
       { status: 500 }

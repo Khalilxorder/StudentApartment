@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
       preferences: data,
     });
   } catch (error) {
-    console.error('Error fetching digest preferences:', error);
+    logger.error({ err: error }, 'Error fetching digest preferences:');
     return NextResponse.json(
       { error: 'Failed to fetch digest preferences' },
       { status: 500 }
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
       preferences: result.data,
     });
   } catch (error) {
-    console.error('Error saving digest preferences:', error);
+    logger.error({ err: error }, 'Error saving digest preferences:');
     return NextResponse.json(
       { error: 'Failed to save digest preferences' },
       { status: 500 }

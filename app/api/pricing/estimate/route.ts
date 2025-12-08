@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 import { pricingService } from '@/services/pricing-svc';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/pricing/estimate
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
       })) || [],
     });
   } catch (error) {
-    console.error('[pricing/estimate] Error:', error);
+    logger.error({ error }, 'Error in pricing estimate');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to estimate price' },
       { status: 500 }

@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 // FILE: app/api/marketing/campaigns/[id]/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
@@ -34,7 +36,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, recipientCount: recipients.length });
   } catch (error) {
-    console.error('Error sending campaign:', error);
+    logger.error({ err: error }, 'Error sending campaign:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -69,7 +71,7 @@ async function getRecipientsForSegment(segment: string, supabase: any): Promise<
   const { data: users, error } = await query;
 
   if (error) {
-    console.error('Error fetching recipients:', error);
+    logger.error({ err: error }, 'Error fetching recipients:');
     return [];
   }
 

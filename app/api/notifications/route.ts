@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { Resend } from 'resend';
 import { emailQueue } from '@/services/notify-svc/email-queue';
+import { logger } from '@/lib/logger';
 
 // Lazy-load Resend for email notifications
 function getResend() {
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
           });
 
         if (error) {
-          console.error('Error scheduling notification:', error);
+          logger.error({ error }, 'Error scheduling notification');
           return NextResponse.json({ error: 'Failed to schedule notification' }, { status: 500 });
         }
 
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
     }
   } catch (error) {
-    console.error('Error in notifications API:', error);
+    logger.error({ error }, 'Error in notifications API');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -135,13 +136,13 @@ export async function GET(request: NextRequest) {
     const { data: notifications, error } = await query.limit(50);
 
     if (error) {
-      console.error('Error fetching notifications:', error);
+      logger.error({ error, userId }, 'Error fetching notifications');
       return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
     }
 
     return NextResponse.json({ notifications });
   } catch (error) {
-    console.error('Error in notifications GET:', error);
+    logger.error({ error }, 'Error in notifications GET');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -163,7 +164,7 @@ export async function PATCH(request: NextRequest) {
         .in('id', notification_ids);
 
       if (error) {
-        console.error('Error marking notifications as read:', error);
+        logger.error({ error, notification_ids }, 'Error marking notifications as read');
         return NextResponse.json({ error: 'Failed to update notifications' }, { status: 500 });
       }
 
@@ -172,7 +173,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('Error in notifications PATCH:', error);
+    logger.error({ error }, 'Error in notifications PATCH');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -244,7 +245,7 @@ async function sendNotification(
       .single();
 
     if (!user) {
-      console.error('User not found for notification');
+      logger.error({ userId }, 'User not found for notification');
       return false;
     }
 
@@ -270,13 +271,13 @@ async function sendNotification(
         break;
 
       default:
-        console.error('Unknown notification type:', type);
+        logger.error({ type }, 'Unknown notification type');
         return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Error sending notification:', error);
+    logger.error({ error }, 'Error sending notification');
     return false;
   }
 }
@@ -292,26 +293,26 @@ async function sendEmailNotification(email: string, subject: string, message: st
     });
 
     if (job) {
-      console.log(`📧 Email queued for ${email}: job ${job.id}`);
+      logger.info({ email, jobId: job.id }, 'Email queued');
     } else {
-      console.warn(`⚠️ Email queue not available, skipped email to ${email}`);
+      logger.warn({ email }, 'Email queue not available, skipped');
     }
   } catch (error) {
-    console.error('Error queuing email:', error);
+    logger.error({ error }, 'Error queuing email');
     throw error;
   }
 }
 
 async function sendSMSNotification(phone: string, message: string) {
   // In a real implementation, you would integrate with an SMS service like Twilio
-  console.log(`SMS to ${phone}: ${message}`);
+  logger.info({ phone, message }, 'SMS notification (mock)');
   // For now, just log the SMS
 }
 
 async function sendPushNotification(userId: string, title: string, message: string, data?: Record<string, any>) {
   // In a real implementation, you would integrate with push notification services
   // like Firebase Cloud Messaging, OneSignal, etc.
-  console.log(`Push notification to ${userId}: ${title} - ${message}`);
+  logger.info({ userId, title, message }, 'Push notification (mock)');
 
   // For web push notifications, you might store device tokens and send through a service
 }

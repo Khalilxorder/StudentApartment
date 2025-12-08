@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -60,15 +62,14 @@ export async function POST(request: NextRequest) {
                 }),
               }
             );
-
             if (response.ok) {
               const data = (await response.json()) as { result: unknown };
               matrix[apartmentId][universityId][mode] = data.result;
             }
           } catch (err) {
-            console.warn(
-              `Failed to calculate commute for ${apartmentId}/${universityId}/${mode}:`,
-              err
+            logger.warn(
+              { err, apartmentId, universityId, mode },
+              'Failed to calculate commute'
             );
             matrix[apartmentId][universityId][mode] = null;
           }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error calculating commute matrix:', error);
+    logger.error({ err: error }, 'Error calculating commute matrix:');
     return NextResponse.json(
       { error: 'Failed to calculate commute matrix' },
       { status: 500 }

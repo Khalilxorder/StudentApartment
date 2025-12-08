@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // Commute Service - Travel time calculations for Budapest universities
@@ -108,7 +110,7 @@ class CommuteService {
             break; // Use first successful mode
           }
         } catch (error) {
-          console.warn(`Failed to calculate ${mode} commute to ${university.id}:`, error);
+          logger.warn({ error, mode, universityId: university.id }, 'Failed to calculate commute');
         }
       }
     }
@@ -147,10 +149,10 @@ class CommuteService {
         universityId: '', // Will be set by caller
         travelTime: Math.round(travelTime),
         distance: Math.round(distance),
-        mode: mode as any,
+        mode: mode as 'walking' | 'bicycling' | 'transit' | 'driving',
       };
     } catch (error) {
-      console.error('Failed to fetch commute time:', error);
+      logger.error({ err: error }, 'Failed to fetch commute time');
       return null;
     }
   }
@@ -247,7 +249,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Commute calculation error:', error);
+    logger.error({ err: error }, 'Commute calculation error:');
     return NextResponse.json(
       { error: 'Commute calculation failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -280,7 +282,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Batch commute calculation error:', error);
+    logger.error({ err: error }, 'Batch commute calculation error:');
     return NextResponse.json(
       { error: 'Batch commute calculation failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

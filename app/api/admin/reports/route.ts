@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabaseClient';
 
@@ -20,7 +22,7 @@ export async function PATCH(request: NextRequest) {
       .eq('id', reportId);
 
     if (reportError) {
-      console.error('Error updating report:', reportError);
+      logger.error({ err: reportError }, 'Error updating report:');
       return NextResponse.json({ error: 'Failed to update report' }, { status: 500 });
     }
 
@@ -55,7 +57,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in admin reports PATCH:', error);
+    logger.error({ err: error }, 'Error in admin reports PATCH:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

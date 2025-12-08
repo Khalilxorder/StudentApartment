@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
+import { logger } from '@/lib/logger';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already has a pending verification
     const { data: existingVerification } = await supabase
-      .from('verifications')
+      .from('verification')
       .select('id, status')
       .eq('user_id', userId)
       .eq('status', 'pending')
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Insert verification record
     const { data: verification, error } = await supabase
-      .from('verifications')
+      .from('verification')
       .insert({
         user_id: userId,
         document_type: documentType,
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Verification submission error:', error);
+      logger.error({ error, userId }, 'Verification submission error');
       return NextResponse.json(
         { success: false, error: 'Failed to submit verification' },
         { status: 500 }
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       verification,
     });
   } catch (error) {
-    console.error('Verification submit error:', error);
+    logger.error({ error }, 'Verification submit error');
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

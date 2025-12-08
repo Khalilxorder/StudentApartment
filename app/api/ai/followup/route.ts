@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateFollowUpQuestions } from '@/utils/gemini';
+import { logger } from '@/lib/logger';
 
 /**
  * Follow-up Questions Generation API
@@ -50,9 +51,9 @@ export async function POST(request: NextRequest) {
       throw new FollowUpError('INVALID_INPUT', 'Story is required and must be a string');
     }
 
-    console.log('[FollowUp] 🤖 Generating follow-up questions with timeout protection...');
+    logger.info('Generating follow-up questions with timeout protection');
     const questions = await generateFollowUpQuestions(story, preferences, askedQuestions);
-    console.log('[FollowUp] ✅ Generated', questions.length, 'questions');
+    logger.info({ count: questions.length }, 'Generated follow-up questions');
 
     const metrics = {
       generation_ms: Date.now() - startTime,
@@ -70,11 +71,7 @@ export async function POST(request: NextRequest) {
     const errorMsg = error?.message || String(error);
     const totalMs = Date.now() - startTime;
 
-    console.error('[FollowUp] ❌ Error:', {
-      code: errorCode,
-      message: errorMsg,
-      totalMs,
-    });
+    logger.error({ code: errorCode, message: errorMsg, totalMs }, 'FollowUp error');
 
     // Retry once on transient errors, but reuse parsed body
     if (
@@ -82,19 +79,19 @@ export async function POST(request: NextRequest) {
       (errorCode === 'AI_TIMEOUT' || errorCode === 'AI_UNAVAILABLE') &&
       totalMs < 5000 // Only retry if quick failure
     ) {
-      console.log('[FollowUp] 🔄 Retrying after transient error...');
+      logger.info('Retrying after transient error');
       try {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
-  const { story, preferences, askedQuestions } = parsedBody;
+        const { story, preferences, askedQuestions } = parsedBody;
         const questions = await generateFollowUpQuestions(story, preferences, askedQuestions);
-        
+
         return NextResponse.json({
           success: true,
           questions,
           metrics: { retried: true, total_ms: Date.now() - startTime },
         });
       } catch (retryError: any) {
-        console.error('[FollowUp] ❌ Retry failed:', retryError?.message);
+        logger.error({ error: retryError?.message }, 'Retry failed');
         // Fall through to error response below
       }
     }
@@ -117,7 +114,7 @@ export async function POST(request: NextRequest) {
  */
 function getErrorCode(error: any): string {
   const message = error?.message || String(error);
-  
+
   if (message.includes('[AI_TIMEOUT]') || message.includes('timed out')) {
     return 'AI_TIMEOUT';
   }
@@ -136,6 +133,6 @@ function getErrorCode(error: any): string {
   if (message.includes('ECONNREFUSED') || message.includes('UNAVAILABLE')) {
     return 'AI_UNAVAILABLE';
   }
-  
+
   return 'AI_UNKNOWN_ERROR';
 }

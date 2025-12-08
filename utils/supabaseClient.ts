@@ -35,22 +35,8 @@ const cookieOptions: CookieOptions = {
 };
 
 const getServerCookieStore = (): any | null => {
-  if (typeof window !== 'undefined') {
-    return null;
-  }
-
-  try {
-    // Dynamically require next/headers to avoid build-time import errors
-    const nodeRequire = Function('return require')() as (moduleId: string) => any;
-    const nextHeaders = nodeRequire('next/headers');
-    if (!nextHeaders?.cookies) {
-      return null;
-    }
-    return nextHeaders.cookies();
-  } catch (error) {
-    // next/headers not available (pages directory or build context)
-    return null;
-  }
+  // Use lib/supabase/server.ts for server-side cookie handling
+  return null;
 };
 
 const getServerClient = (): SupabaseClient => {

@@ -329,8 +329,13 @@ export interface ErrorResponse {
 
 export function handleError(error: unknown, requestId?: string): ErrorResponse {
   const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorCode = (error as any)?.code || 'INTERNAL_ERROR';
-  const errorDetails = (error as any)?.details;
+  const errorObj = error as Record<string, unknown> | null;
+  const errorCode = (errorObj && typeof errorObj === 'object' && 'code' in errorObj)
+    ? String(errorObj.code)
+    : 'INTERNAL_ERROR';
+  const errorDetails = (errorObj && typeof errorObj === 'object' && 'details' in errorObj)
+    ? errorObj.details as Record<string, unknown>
+    : undefined;
 
   ProductionLogger.error('API Error', {
     message: errorMessage,

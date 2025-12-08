@@ -8,7 +8,24 @@ import pino from 'pino';
 // Create logger instance
 export const logger = pino({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-  
+
+  // Redact sensitive information (PII)
+  redact: {
+    paths: [
+      'email',
+      'password',
+      '*.email',
+      '*.password',
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'user.email',
+      'user.password',
+      'token',
+      '*.token',
+    ],
+    remove: true,
+  },
+
   // Format configuration
   ...(process.env.NODE_ENV !== 'production' && {
     transport: {
@@ -24,6 +41,7 @@ export const logger = pino({
   // Base configuration for all logs
   base: {
     env: process.env.NODE_ENV,
+    service: 'student-apartments',
   },
 
   // Serialize errors properly
@@ -69,7 +87,7 @@ export function logResponse(
   metadata?: Record<string, any>
 ) {
   const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
-  
+
   logger[logLevel]({
     type: 'response',
     method,

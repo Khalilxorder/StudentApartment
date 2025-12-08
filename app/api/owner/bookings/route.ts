@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const supabase = createClient();
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       count: count ?? 0,
     });
   } catch (error) {
-    console.error('Owner bookings API error:', error);
+    logger.error({ error }, 'Owner bookings API error');
     return NextResponse.json({ error: 'Failed to load bookings' }, { status: 500 });
   }
 }

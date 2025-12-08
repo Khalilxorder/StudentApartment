@@ -70,6 +70,7 @@ export function StudentNavigation() {
         { href: '/dashboard/bookings', label: 'Bookings' },
         { href: '/dashboard/messages', label: 'Messages' },
         { href: '/dashboard/profile', label: 'Profile' },
+        { href: '/apartments/create', label: 'List Your Place', badge: 'New' },
         { href: '/search', label: 'Search Listings' },
         { href: '/trust-safety', label: 'Trust & Safety' },
       ]}

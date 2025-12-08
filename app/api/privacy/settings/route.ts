@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(defaultSettings);
 
   } catch (error) {
-    console.error('Privacy settings fetch error:', error);
+    logger.error({ error }, 'Privacy settings fetch error');
     return NextResponse.json(
       { error: 'Failed to fetch privacy settings' },
       { status: 500 }
@@ -95,7 +96,7 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Privacy settings update error:', error);
+      logger.error({ error, userId }, 'Privacy settings update error');
       return NextResponse.json(
         { error: 'Failed to update privacy settings' },
         { status: 500 }
@@ -105,7 +106,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Privacy settings update error:', error);
+    logger.error({ error }, 'Privacy settings update error');
     return NextResponse.json(
       { error: 'Failed to update privacy settings' },
       { status: 500 }

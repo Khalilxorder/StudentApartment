@@ -12,11 +12,11 @@ export function getStripe(): Stripe | null {
   if (!key) return null;
 
   // Require at runtime so import doesn't instantiate during static analysis
-  const StripeCtor = require('stripe') as typeof import('stripe');
-  _stripe = new (StripeCtor as any)(key, {
+  const StripeCtor = require('stripe').default as new (key: string, options: { apiVersion: string; typescript: boolean }) => Stripe;
+  _stripe = new StripeCtor(key, {
     apiVersion: '2024-06-20',
     typescript: true,
-  }) as unknown as Stripe;
+  });
   return _stripe;
 }
 

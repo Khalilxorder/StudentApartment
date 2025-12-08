@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient, createServiceClient } from '@/utils/supabaseClient';
 import { rankingService } from '@/services/ranking-svc';
 import { runQuery } from '@/lib/db/pool';
+import { logger } from '@/lib/logger';
 
 const BANDIT_COMPONENTS = [
   'constraintFit',
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (insertError) {
-      console.error('Feedback insert error:', insertError);
+      logger.error({ insertError, apartmentId: validatedData.apartmentId }, 'Feedback insert error');
       return NextResponse.json(
         { error: 'Failed to store feedback' },
         { status: 500 },
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       componentScores,
     });
   } catch (error) {
-    console.error('Feedback API error:', error);
+    logger.error({ error }, 'Feedback API error');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -293,11 +294,11 @@ async function updateBanditWeights(componentScores: ComponentScores, feedbackSco
   const newWeights =
     totalSample > 0
       ? Object.fromEntries(
-          BANDIT_COMPONENTS.map((key) => [
-            key,
-            Number((sampled[key] / totalSample).toFixed(4)),
-          ]),
-        )
+        BANDIT_COMPONENTS.map((key) => [
+          key,
+          Number((sampled[key] / totalSample).toFixed(4)),
+        ]),
+      )
       : { ...DEFAULT_BANDIT_WEIGHTS };
 
   await runQuery(
@@ -354,7 +355,7 @@ function extractCommuteMinutes(cache: unknown, targetUniversity?: string): numbe
     const entry = data[university];
     if (!entry || typeof entry !== 'object') continue;
 
-    for (const modeValues of Object.values(entry) as any[]) {
+    for (const modeValues of Object.values(entry) as Array<{ minutes?: number; travelMinutes?: number; travel_minutes?: number } | null>) {
       if (!modeValues) continue;
       const minutes = toNumber(modeValues.minutes ?? modeValues.travelMinutes ?? modeValues.travel_minutes, NaN);
       if (!Number.isFinite(minutes)) continue;

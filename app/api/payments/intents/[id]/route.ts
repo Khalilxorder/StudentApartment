@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 /**
  * GET /api/payments/intents/[id]
  * Retrieve a specific payment intent
@@ -75,7 +77,7 @@ export async function GET(
       metadata: stripeIntent.metadata,
     });
   } catch (error) {
-    console.error('Error retrieving payment intent:', error);
+    logger.error({ err: error }, 'Error retrieving payment intent:');
     return NextResponse.json(
       { error: 'Failed to retrieve payment intent' },
       { status: 500 }

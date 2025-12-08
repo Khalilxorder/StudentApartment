@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
 
 interface ViewingSlot {
   apartmentId: string;
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error('Error fetching viewing slots:', error);
+    logger.error({ error }, 'Error fetching viewing slots');
     return NextResponse.json(
       { error: 'Failed to fetch viewing slots' },
       { status: 500 }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating viewing slot:', error);
+    logger.error({ error }, 'Error creating viewing slot');
     return NextResponse.json(
       { error: 'Failed to create viewing slot' },
       { status: 500 }

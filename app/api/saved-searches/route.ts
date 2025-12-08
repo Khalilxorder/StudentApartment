@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // GET /api/saved-searches - Get user's saved searches
 export async function GET(request: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching saved searches:', error);
+      logger.error({ error, userId: user.id }, 'Error fetching saved searches');
       return NextResponse.json(
         { error: 'Failed to fetch saved searches' },
         { status: 500 }
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ savedSearches: savedSearches || [] });
 
   } catch (error) {
-    console.error('Saved searches API error:', error);
+    logger.error({ error }, 'Saved searches API error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('Error creating saved search:', insertError);
+      logger.error({ insertError, userId: user.id }, 'Error creating saved search');
       return NextResponse.json(
         { error: 'Failed to create saved search' },
         { status: 500 }
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Create saved search error:', error);
+    logger.error({ error }, 'Create saved search error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

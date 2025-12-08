@@ -2,9 +2,10 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2023-10-16' as any,
+  apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
 });
 
 const supabaseAdmin = createServiceClient();
@@ -88,7 +89,7 @@ export async function PUT(
             status: paymentIntent.status,
           };
         } catch (stripeError: any) {
-          console.error('Stripe confirmation error:', stripeError);
+          logger.error({ stripeError, bookingId }, 'Stripe confirmation error');
           return NextResponse.json(
             { success: false, error: 'Failed to confirm payment: ' + stripeError.message },
             { status: 400 }
@@ -101,7 +102,7 @@ export async function PUT(
         try {
           const refund = await stripe.refunds.create({
             payment_intent: paymentIntentId,
-            reason: (refundReason || 'requested_by_customer') as any,
+            reason: (refundReason || 'requested_by_customer') as Stripe.RefundCreateParams.Reason,
           });
           stripeAction = {
             type: 'refunded',
@@ -110,7 +111,7 @@ export async function PUT(
             status: refund.status,
           };
         } catch (stripeError: any) {
-          console.error('Stripe refund error:', stripeError);
+          logger.error({ stripeError, bookingId }, 'Stripe refund error');
           return NextResponse.json(
             { success: false, error: 'Failed to process refund: ' + stripeError.message },
             { status: 400 }
@@ -165,7 +166,7 @@ export async function PUT(
         }),
       });
     } catch (emailError) {
-      console.error('Email notification failed:', emailError);
+      logger.error({ emailError, bookingId }, 'Email notification failed');
       // Don't fail the request if email fails
     }
 
@@ -175,7 +176,7 @@ export async function PUT(
       message: `Booking ${status}`,
     });
   } catch (error: any) {
-    console.error('Error updating booking status:', error);
+    logger.error({ error }, 'Error updating booking status');
     return NextResponse.json(
       { success: false, error: error.message || 'Internal server error' },
       { status: 500 }
@@ -227,7 +228,7 @@ export async function GET(
       activityLog,
     });
   } catch (error: any) {
-    console.error('Error fetching booking:', error);
+    logger.error({ error, bookingId: params.id }, 'Error fetching booking');
     return NextResponse.json(
       { success: false, error: error.message || 'Internal server error' },
       { status: 500 }

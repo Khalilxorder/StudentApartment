@@ -5,19 +5,20 @@ import { getStripe } from '@/lib/stripe/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 // import * as Sentry from '@sentry/nextjs'; // Temporarily disabled due to parsing error
 import type Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   // Create a Stripe instance at request-time for webhook signature verification
   // We prefer to use getStripe(), but construct a fresh instance if needed
   let stripeInstance = getStripe();
   if (!stripeInstance) {
-    const StripeCtor = require('stripe') as typeof import('stripe');
+    const StripeCtor = require('stripe').default as new (key: string, options: { apiVersion: string }) => import('stripe').Stripe;
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json({ error: 'Stripe secret not configured' }, { status: 500 });
     }
-    stripeInstance = new (StripeCtor as any)(process.env.STRIPE_SECRET_KEY!, {
+    stripeInstance = new StripeCtor(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: '2024-06-20',
-    }) as import('stripe').Stripe;
+    });
   }
 
   const body = await request.text();
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
+    logger.error({ err: err.message }, 'Webhook signature verification failed');
     // Sentry.captureException(err, {
     //   tags: { webhook: 'stripe_signature_verification' },
     // }); // Temporarily disabled due to parsing error
@@ -55,11 +56,11 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.succeeded':
         await handlePaymentSuccess(event.data.object as Stripe.PaymentIntent);
         break;
-      
+
       case 'payment_intent.payment_failed':
         await handlePaymentFailure(event.data.object as Stripe.PaymentIntent);
         break;
-      
+
       case 'payment_intent.canceled':
         await handlePaymentCanceled(event.data.object as Stripe.PaymentIntent);
         break;
@@ -75,14 +76,14 @@ export async function POST(request: NextRequest) {
       case 'payout.paid':
         await handlePayoutPaid(event.data.object as Stripe.Payout);
         break;
-      
+
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.info(`Unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('Webhook handler error:', error);
+    logger.error({ error, eventType: event?.type }, 'Webhook handler error');
     // Sentry.captureException(error, {
     //   tags: { webhook: 'stripe_handler' },
     //   extra: { eventType: event?.type },
@@ -100,7 +101,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   const bookingId = metadata.booking_id;
   const userId = metadata.user_id;
 
-  console.log(`✅ Payment succeeded for booking: ${bookingId}`);
+  logger.info(`✅ Payment succeeded for booking: ${bookingId}`);
 
   // 1. Update booking status
   await supabase
@@ -140,7 +141,8 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     .single();
 
   if (booking && booking.owner_id) {
-    const apartmentTitle = (booking.apartments as any)?.title || 'your apartment';
+    const apartments = booking.apartments as { title?: string } | undefined;
+    const apartmentTitle = apartments?.title || 'your apartment';
     await supabase.from('notifications').insert({
       user_id: booking.owner_id,
       type: 'booking',
@@ -150,11 +152,69 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     });
   }
 
-  // 5. TODO: Send confirmation emails (integrate with Resend/SendGrid)
-  // await sendBookingConfirmationEmail(userId, bookingId);
-  // await sendOwnerNotificationEmail(booking.owner_id, bookingId);
+  // 5. Send confirmation emails using email queue
+  try {
+    // Get user email for confirmation
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', userId)
+      .single();
 
-  console.log(`📧 Notifications sent for booking: ${bookingId}`);
+    if (userProfile?.email) {
+      // Dynamically import email queue to avoid build-time issues
+      const { emailQueue } = await import('@/services/notify-svc/email-queue');
+
+      // Send booking confirmation to renter
+      const guestName = userProfile.full_name || 'Guest';
+      await emailQueue.addEmailJob({
+        to: userProfile.email,
+        subject: 'Booking Confirmed - Student Apartments',
+        html: `
+          <h1>Booking Confirmed!</h1>
+          <p>Dear ${guestName},</p>
+          <p>Your booking (ID: ${bookingId}) has been confirmed.</p>
+          <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been processed successfully.</p>
+          <p>You can view your booking details in your dashboard.</p>
+          <p>Thank you for using Student Apartments!</p>
+        `,
+        tags: [{ name: 'type', value: 'booking-confirmation' }]
+      });
+
+      // Notify owner if available
+      if (booking?.owner_id) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', booking.owner_id)
+          .single();
+
+        if (ownerProfile?.email) {
+          const apartmentTitle = (booking.apartments as { title?: string })?.title || 'your apartment';
+          const ownerName = ownerProfile.full_name || 'Owner';
+          await emailQueue.addEmailJob({
+            to: ownerProfile.email,
+            subject: 'New Booking Received - Student Apartments',
+            html: `
+              <h1>New Booking Received!</h1>
+              <p>Dear ${ownerName},</p>
+              <p>You have a new booking for ${apartmentTitle}.</p>
+              <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been received.</p>
+              <p>Booking ID: ${bookingId}</p>
+              <p>Please review the booking in your owner dashboard.</p>
+            `,
+            tags: [{ name: 'type', value: 'owner-booking-notification' }]
+          });
+        }
+      }
+      logger.info({ bookingId }, '📧 Confirmation emails queued successfully');
+    }
+  } catch (emailError) {
+    // Don't fail the webhook if email fails - just log it
+    logger.warn({ emailError, bookingId }, 'Failed to send confirmation emails');
+  }
+
+  logger.info(`📧 Notifications sent for booking: ${bookingId}`);
 }
 
 async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
@@ -163,7 +223,7 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
   const bookingId = metadata.booking_id;
   const userId = metadata.user_id;
 
-  console.log(`❌ Payment failed for booking: ${bookingId}`);
+  logger.info(`❌ Payment failed for booking: ${bookingId}`);
 
   // 1. Update booking status
   await supabase
@@ -199,7 +259,7 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
   const metadata = paymentIntent.metadata || {};
   const bookingId = metadata.booking_id;
 
-  console.log(`🚫 Payment canceled for booking: ${bookingId}`);
+  logger.info(`🚫 Payment canceled for booking: ${bookingId}`);
 
   await supabase
     .from('bookings')
@@ -225,11 +285,11 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
   const bookingId = metadata?.booking_id;
   const userId = metadata?.user_id;
 
-  console.log(`💰 Payout created: ${id} for booking: ${bookingId}`);
+  logger.info(`💰 Payout created: ${id} for booking: ${bookingId}`);
 
   // 1. Verify owner is verified before allowing payout
   if (!userId) {
-    console.error(`❌ Payout blocked: No user ID in metadata for payout ${id}`);
+    logger.error({ payoutId: id }, 'Payout blocked: No user ID in metadata');
     // Cancel the payout if no user ID
     const stripeClient = getStripe();
     if (stripeClient) await stripeClient.payouts.cancel(id);
@@ -244,14 +304,14 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
     .single();
 
   if (accountError || !stripeAccount) {
-    console.error(`❌ Payout blocked: No Stripe Connect account for user ${userId}`);
+    logger.error({ userId }, 'Payout blocked: No Stripe Connect account');
     const stripeClient = getStripe();
     if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 
   if (stripeAccount.status !== 'active') {
-    console.error(`❌ Payout blocked: Stripe account not verified for user ${userId} (status: ${stripeAccount.status})`);
+    logger.error({ userId, status: stripeAccount.status }, 'Payout blocked: Stripe account not verified');
     const stripeClient = getStripe();
     if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
@@ -263,18 +323,18 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
     if (!stripeClient) throw new Error('Stripe not configured');
     const account = await stripeClient.accounts.retrieve(stripeAccount.stripe_account_id);
     if (!account.payouts_enabled) {
-      console.error(`❌ Payout blocked: Payouts not enabled for Stripe account ${stripeAccount.stripe_account_id}`);
+      logger.error({ stripeAccountId: stripeAccount.stripe_account_id }, 'Payout blocked: Payouts not enabled');
       await stripeClient.payouts.cancel(id);
       return;
     }
   } catch (error) {
-    console.error(`❌ Payout blocked: Error verifying Stripe account ${stripeAccount.stripe_account_id}:`, error);
+    logger.error({ error, stripeAccountId: stripeAccount.stripe_account_id }, 'Payout blocked: Error verifying Stripe account');
     const stripeClient = getStripe();
     if (stripeClient) await stripeClient.payouts.cancel(id);
     return;
   }
 
-  console.log(`✅ Payout approved: Owner ${userId} is verified and payouts enabled`);
+  logger.info(`✅ Payout approved: Owner ${userId} is verified and payouts enabled`);
 
   // 2. Update booking status to paid
   if (bookingId) {
@@ -320,7 +380,7 @@ async function handlePayoutFailed(payout: Stripe.Payout) {
   const bookingId = metadata?.booking_id;
   const userId = metadata?.user_id;
 
-  console.log(`❌ Payout failed: ${id} for booking: ${bookingId}`);
+  logger.info(`❌ Payout failed: ${id} for booking: ${bookingId}`);
 
   // 1. Update the payout status in payment_transactions
   await supabase
@@ -347,7 +407,7 @@ async function handlePayoutPaid(payout: Stripe.Payout) {
   const bookingId = metadata?.booking_id;
   const userId = metadata?.user_id;
 
-  console.log(`✅ Payout paid: ${id} for booking: ${bookingId}`);
+  logger.info(`✅ Payout paid: ${id} for booking: ${bookingId}`);
 
   // 1. Update the payout status in payment_transactions
   await supabase

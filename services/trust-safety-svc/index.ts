@@ -102,7 +102,7 @@ export class TrustSafetyService {
       if (matches.length > 0) {
         const alert: SafetyAlert = {
           id: this.generateAlertId(),
-          type: pattern.pattern as any,
+          type: pattern.pattern as SafetyAlert['type'],
           severity: this.getSeverityFromRisk(pattern.riskLevel),
           userId,
           description: `${pattern.description} detected`,
@@ -327,7 +327,7 @@ export class TrustSafetyService {
         timestamp: new Date().toISOString(),
       },
     });
-    
+
     if (error) {
       console.error('Failed to store risk score:', error);
     }
@@ -347,7 +347,7 @@ export class TrustSafetyService {
         status: alert.status,
       },
     });
-    
+
     if (error) {
       console.error('Failed to store alert:', error);
     }
@@ -355,14 +355,14 @@ export class TrustSafetyService {
 
   private async restrictUser(userId: string, reason: string): Promise<void> {
     const supabase = createServiceClient();
-    
+
     const { error } = await supabase
       .from('auth.users')
       .update({
         user_metadata: { restricted: true, restrictionReason: reason },
       })
       .eq('id', userId);
-    
+
     if (error) {
       console.error('Failed to restrict user:', error);
     }
@@ -377,11 +377,11 @@ export class TrustSafetyService {
       .eq('actor_id', userId)
       .order('created_at', { ascending: true })
       .limit(1);
-    
+
     if (!data || data.length === 0) {
       return 1.0; // New account - highest risk
     }
-    
+
     const createdDate = new Date(data[0].created_at);
     const ageMonths = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
     return Math.min(ageMonths / 12, 1.0); // Normalize to 0-1 scale
@@ -393,11 +393,11 @@ export class TrustSafetyService {
       .from('verification')
       .select('status')
       .eq('user_id', userId);
-    
+
     if (!data || data.length === 0) {
       return 0.9; // Not verified - high risk
     }
-    
+
     const verified = data.some((v: any) => v.status === 'verified');
     return verified ? 0.1 : 0.7; // Low risk if verified
   }
@@ -409,7 +409,7 @@ export class TrustSafetyService {
       .select('created_at')
       .eq('actor_id', userId)
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-    
+
     const recentActivity = data?.length || 0;
     // Moderate activity (5-50 events/month) is normal
     if (recentActivity >= 5 && recentActivity <= 50) {
@@ -430,11 +430,11 @@ export class TrustSafetyService {
       .from('reviews')
       .select('rating')
       .eq('user_id', userId);
-    
+
     if (!reviews || reviews.length === 0) {
       return 0.7; // No reviews - higher risk
     }
-    
+
     const avgRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length;
     return 1 - (avgRating / 5) * 0.5; // Better ratings reduce risk
   }
@@ -446,7 +446,7 @@ export class TrustSafetyService {
       .select('metadata')
       .eq('actor_id', userId)
       .eq('event', 'safety_alert_created');
-    
+
     const incidents = data?.length || 0;
     return Math.min(incidents / 5, 1.0); // Normalize incident count
   }
@@ -459,31 +459,31 @@ export class TrustSafetyService {
       .eq('user_id', userId)
       .eq('verification_type', 'student')
       .single();
-    
+
     if (!data) {
       return 'No student ID found';
     }
-    
+
     return null; // Valid
   }
 
   private async checkEmailSuspicious(userId: string): Promise<string | null> {
     const supabase = createServiceClient(); // Use service client for admin API
     const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
-    
+
     if (error || !user?.email) {
       console.error('Failed to get user email:', error);
       return 'No email found';
     }
-    
+
     // Check for disposable email domains
     const disposableDomains = ['tempmail', '10minutemail', 'guerrillamail'];
     const domain = user.email.split('@')[1];
-    
+
     if (disposableDomains.some(d => domain.includes(d))) {
       return 'Suspicious email domain';
     }
-    
+
     return null;
   }
 
@@ -507,21 +507,21 @@ export class TrustSafetyService {
       .select('*')
       .eq('id', apartmentId)
       .single();
-    
+
     return data || {};
   }
 
   private async findDuplicateListings(apartmentId: string): Promise<any[]> {
     // Import the enhanced duplicate detection service
     const { enhancedDuplicateDetectionService } = await import('@/services/duplicate-detection-svc');
-    
+
     try {
       // Use incremental method for faster detection
       const result = await enhancedDuplicateDetectionService.detectDuplicatesForApartment(
         apartmentId,
         'incremental'
       );
-      
+
       // Return high-confidence matches
       return result.matches
         .filter(match => match.confidence === 'high' || (match.confidence === 'medium' && match.totalScore >= 0.65))
@@ -533,7 +533,7 @@ export class TrustSafetyService {
         }));
     } catch (error) {
       console.error('Error in enhanced duplicate detection:', error);
-      
+
       // Fallback to simple exact match detection
       const supabase = createClient();
       const { data: current } = await supabase
@@ -541,9 +541,9 @@ export class TrustSafetyService {
         .select('title, address, price')
         .eq('id', apartmentId)
         .single();
-      
+
       if (!current) return [];
-      
+
       // Find similar listings using exact match
       const { data: duplicates } = await supabase
         .from('apartments')
@@ -551,7 +551,7 @@ export class TrustSafetyService {
         .neq('id', apartmentId)
         .eq('title', current.title)
         .eq('address', current.address);
-      
+
       return duplicates || [];
     }
   }
@@ -1038,8 +1038,8 @@ export class TrustSafetyService {
 
     const intervals: number[] = [];
     for (let i = 1; i < activities.length; i++) {
-      const interval = new Date(activities[i-1].created_at).getTime() -
-                      new Date(activities[i].created_at).getTime();
+      const interval = new Date(activities[i - 1].created_at).getTime() -
+        new Date(activities[i].created_at).getTime();
       intervals.push(interval);
     }
 

@@ -6,10 +6,52 @@ import { bookingSchema, validateInput } from '@/lib/validation/schemas';
 // import * as Sentry from '@sentry/nextjs'; // Temporarily disabled due to parsing error
 import { logRequest, logResponse, logError, logEvent } from '@/lib/logger';
 
+/**
+ * @swagger
+ * /api/payments/create-intent:
+ *   post:
+ *     summary: Create payment intent
+ *     description: Creates a Stripe payment intent for booking
+ *     tags: [Payments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [apartmentId, userId, move InDate]
+ *             properties:
+ *               apartmentId:
+ *                 type: string
+ *                 format: uuid
+ *               userId:
+ *                 type: string
+ *                 format: uuid
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *               leaseMonths:
+ *                 type: number
+ *                 default: 12
+ *     responses:
+ *       200:
+ *         description: Payment intent created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 clientSecret:
+ *                   type: string
+ *                 bookingId:
+ *                   type: string
+ *                 amount:
+ *                   type: number
+ */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   logRequest('POST', '/api/payments/create-intent');
-  
+
   // Check if Stripe is configured
   if (!isStripeConfigured()) {
     logResponse('POST', '/api/payments/create-intent', 500, Date.now() - startTime);
@@ -18,7 +60,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-  
+
   let body: any;
   try {
     body = await request.json();
@@ -28,7 +70,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       logResponse('POST', '/api/payments/create-intent', 400, Date.now() - startTime);
       return NextResponse.json(
-        { error: (validation as any).error },
+        { error: 'error' in validation ? validation.error : 'Validation failed' },
         { status: 400 }
       );
     }
@@ -105,7 +147,7 @@ export async function POST(request: NextRequest) {
       },
       description: `Booking for ${apartment.title} - ${depositMonths} months deposit + 1 month rent`,
     });
-    
+
     if (!paymentIntent.client_secret) {
       logError(new Error('No client secret from Stripe'), {
         api_route: 'payment_intent',
@@ -146,9 +188,9 @@ export async function POST(request: NextRequest) {
       apartmentId,
       amount: totalAmount,
     });
-    
+
     logResponse('POST', '/api/payments/create-intent', 200, Date.now() - startTime);
-    
+
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       bookingId: booking.id,
@@ -165,14 +207,14 @@ export async function POST(request: NextRequest) {
       apartmentId: body?.apartmentId,
       userId: body?.userId,
     });
-    
+
     // Sentry.captureException(error, {
     //   tags: { api_route: 'payment_intent' },
     //   extra: { apartmentId: body?.apartmentId, userId: body?.userId },
     // }); // Temporarily disabled due to parsing error
-    
+
     logResponse('POST', '/api/payments/create-intent', 500, Date.now() - startTime);
-    
+
     return NextResponse.json(
       { error: 'Payment initialization failed', details: error.message },
       { status: 500 }

@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 // FILE: app/api/marketing/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ campaigns });
   } catch (error) {
-    console.error('Error fetching campaigns:', error);
+    logger.error({ err: error }, 'Error fetching campaigns:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
     const campaignId = await emailCampaigns.createCampaign({
       name,
       templateId,
-      segment: segment as any,
+      segment: segment as 'all' | 'active_users' | 'inactive_users' | 'new_users' | 'premium_users',
       recipientCount: 0, // Will be updated when sending
     });
 
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ campaignId });
   } catch (error) {
-    console.error('Error creating campaign:', error);
+    logger.error({ err: error }, 'Error creating campaign:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

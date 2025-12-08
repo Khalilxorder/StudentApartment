@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
 import { batchCalculateSuitabilityScores } from '@/utils/gemini';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { data: apartments, error } = await apartmentsQuery;
 
     if (error) {
-      console.error('Database error:', error);
+      logger.error({ error }, 'Database error in AI search');
       return NextResponse.json(
         { error: 'Failed to fetch apartments' },
         { status: 500 }
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       query: query,
       ...filters
     };
-    
+
     const scoredResults = await batchCalculateSuitabilityScores(apartments, userProfile);
 
     // Convert Map to array and sort by score (highest first)
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('AI search error:', error);
+    logger.error({ error }, 'AI search error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

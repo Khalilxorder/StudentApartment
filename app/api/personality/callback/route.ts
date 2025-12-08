@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
       message: 'Personality assessment saved successfully'
     });
   } catch (error) {
-    console.error('Personality assessment callback error:', error);
+    logger.error({ err: error }, 'Personality assessment callback error:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

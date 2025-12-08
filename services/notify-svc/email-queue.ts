@@ -1,8 +1,6 @@
 // Email Queue Service using BullMQ
 // Handles asynchronous email sending with Redis/Upstash
 
-import { Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
 import { Resend } from 'resend';
 
 export interface EmailJobData {
@@ -14,16 +12,42 @@ export interface EmailJobData {
   retryCount?: number;
 }
 
-export class EmailQueueService {
-  private queue: Queue | null = null;
-  private worker: Worker | null = null;
+class EmailQueueService {
+  private queue: any = null;
+  private worker: any = null;
   private resend: Resend | null;
+  private initialized = false;
 
   constructor() {
+    // Don't initialize in constructor - lazy initialize on first use
+    this.resend = process.env.RESEND_API_KEY
+      ? new Resend(process.env.RESEND_API_KEY)
+      : null;
+  }
+
+  private async initialize() {
+    if (this.initialized) return;
+
+    // Skip during build time or in browser
+    if (typeof window !== 'undefined') {
+      this.initialized = true;
+      return;
+    }
+
     try {
-      // Initialize Redis connection
+      // Skip initialization during build (no REDIS_URL set)
       const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
       const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      if (!redisUrl && !redisToken) {
+        console.warn('⚠️ No Redis URL configured, email queue disabled');
+        this.initialized = true;
+        return;
+      }
+
+      // Dynamic imports to prevent build-time bundling
+      const { Queue } = await import('bullmq');
+      const IORedis = (await import('ioredis')).default;
 
       let connection: any;
       if (redisUrl && redisToken) {
@@ -38,67 +62,45 @@ export class EmailQueueService {
         // Standard Redis
         const redis = new IORedis(redisUrl, {
           maxRetriesPerRequest: null,
-          retryStrategy: (times) => {
-            if (times > 3) return null; // Stop retrying after 3 attempts
+          retryStrategy: (times: number) => {
+            if (times > 3) return null;
             return Math.min(times * 50, 2000);
           }
         });
-        redis.on('error', (err) => {
+        redis.on('error', (err: Error) => {
           console.warn('Redis connection error in EmailQueue:', err.message);
         });
         connection = redis;
-      } else {
-        // Fallback to local Redis
-        connection = {
-          host: 'localhost',
-          port: 6379,
-        };
       }
 
-      // Initialize queue
-      this.queue = new Queue('email-queue', {
-        connection,
-        defaultJobOptions: {
-          removeOnComplete: 50,
-          removeOnFail: 100,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 5000,
+      if (connection) {
+        this.queue = new Queue('email-queue', {
+          connection,
+          defaultJobOptions: {
+            removeOnComplete: 50,
+            removeOnFail: 100,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 5000,
+            },
           },
-        },
-      });
+        });
+        console.log('📧 Email queue service initialized');
+      }
 
-      // Initialize Resend
-      this.resend = process.env.RESEND_API_KEY
-        ? new Resend(process.env.RESEND_API_KEY)
-        : null;
-
-      // Initialize worker
-      this.worker = new Worker('email-queue', this.processEmailJob.bind(this), {
-        connection,
-        concurrency: 5, // Process up to 5 emails simultaneously
-      });
-
-      // Worker event handlers
-      this.worker.on('completed', (job) => {
-        console.log(`✅ Email job ${job.id} completed`);
-      });
-
-      this.worker.on('failed', (job, err) => {
-        console.error(`❌ Email job ${job?.id} failed:`, err);
-      });
-
-      console.log('📧 Email queue service initialized');
+      this.initialized = true;
     } catch (error) {
-      console.warn('⚠️ Failed to initialize EmailQueueService (likely build environment):', error);
+      console.warn('⚠️ Failed to initialize EmailQueueService:', error);
       this.queue = null;
       this.worker = null;
-      this.resend = null;
+      this.initialized = true;
     }
   }
 
   async addEmailJob(data: EmailJobData, options?: { delay?: number; priority?: number }) {
+    await this.initialize();
+
     if (!this.queue) {
       console.warn('⚠️ EmailQueueService not initialized, skipping email job');
       return null;
@@ -120,6 +122,8 @@ export class EmailQueueService {
   }
 
   async addBulkEmails(emails: EmailJobData[], batchSize: number = 10) {
+    await this.initialize();
+
     if (!this.queue) {
       console.warn('⚠️ EmailQueueService not initialized, skipping bulk emails');
       return [];
@@ -130,14 +134,13 @@ export class EmailQueueService {
     for (let i = 0; i < emails.length; i += batchSize) {
       const batch = emails.slice(i, i + batchSize);
       const batchJobs = await this.queue.addBulk(
-        batch.map(email => ({
+        batch.map((email: EmailJobData) => ({
           name: 'send-email',
           data: { ...email, retryCount: email.retryCount || 0 },
         }))
       );
       jobs.push(...batchJobs);
 
-      // Small delay between batches to avoid overwhelming Redis
       if (i + batchSize < emails.length) {
         await this.delay(100);
       }
@@ -145,42 +148,6 @@ export class EmailQueueService {
 
     console.log(`📧 Bulk email jobs queued: ${jobs.length} emails`);
     return jobs;
-  }
-
-  private async processEmailJob(job: any) {
-    const { to, subject, html, from, tags, retryCount } = job.data;
-
-    if (!this.resend) {
-      throw new Error('Resend not configured');
-    }
-
-    try {
-      const result = await this.resend.emails.send({
-        from: from || 'Student Apartments <noreply@studentapartments.com>',
-        to,
-        subject,
-        html,
-        tags: tags || [{ name: 'source', value: 'queue' }],
-      });
-
-      console.log(`📧 Email sent successfully: ${result.data?.id} to ${to}`);
-      return result;
-    } catch (error) {
-      console.error(`❌ Failed to send email to ${to}:`, error);
-
-      // If this is a retry and we've exceeded max attempts, don't retry
-      if (retryCount >= 2) {
-        throw new Error(`Email failed after ${retryCount + 1} attempts: ${error}`);
-      }
-
-      // Add retry job with incremented count
-      await this.addEmailJob(
-        { ...job.data, retryCount: retryCount + 1 },
-        { delay: Math.pow(2, retryCount) * 60000 } // Exponential backoff in minutes
-      );
-
-      throw error;
-    }
   }
 
   async getQueueStats() {
@@ -211,5 +178,5 @@ export class EmailQueueService {
   }
 }
 
-// Export singleton instance
+// Export lazy-loaded singleton - constructor doesn't connect to Redis
 export const emailQueue = new EmailQueueService();

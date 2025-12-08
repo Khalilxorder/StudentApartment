@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-10-29.clover',
+  apiVersion: '2024-11-20.acacia' as Stripe.LatestApiVersion,
 });
 
 /**
@@ -12,7 +13,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('❌ STRIPE_SECRET_KEY not configured');
+      logger.error('STRIPE_SECRET_KEY not configured');
       return NextResponse.json(
         { error: 'Stripe is not configured. Please contact support.' },
         { status: 500 }
@@ -73,14 +74,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.error('Stripe error:', stripeError.message);
+      logger.error({ error: stripeError.message }, 'Stripe onboard error');
       return NextResponse.json(
         { error: 'Failed to create Stripe onboarding link' },
         { status: 500 }
       );
     }
   } catch (error: any) {
-    console.error('❌ Onboarding error:', error);
+    logger.error({ error }, 'Onboarding error');
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

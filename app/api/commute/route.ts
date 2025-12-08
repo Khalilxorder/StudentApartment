@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { commuteService } from '@/services/commute-svc';
+import { logger } from '@/lib/logger';
 
 // GET /api/commute?apartmentId=123&universityId=elte&mode=transit
 export async function GET(request: NextRequest) {
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Commute API error:', error);
+    logger.error({ error }, 'Commute API error');
     return NextResponse.json(
       { error: 'Failed to calculate commute' },
       { status: 500 }
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Batch commute API error:', error);
+    logger.error({ error }, 'Batch commute API error');
     return NextResponse.json(
       { error: 'Failed to calculate commutes' },
       { status: 500 }

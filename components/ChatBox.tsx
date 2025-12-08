@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { sanitizeUserInput } from '@/lib/sanitize';
-import { supabase } from '@/utils/supabaseClient';
+import { createClient } from '@/utils/supabaseClient';
 
 interface Message {
     id: string;
@@ -11,6 +11,8 @@ interface Message {
     read: boolean;
     sender_id: string;
     receiver_id: string;
+    is_delivered?: boolean;
+    is_read?: boolean;
     sender?: {
         first_name: string;
         last_name: string;
@@ -71,6 +73,7 @@ export default function ChatBox({
     // Initialize current user
     useEffect(() => {
         const initialize = async () => {
+            const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setCurrentUserId(user.id);
@@ -80,10 +83,15 @@ export default function ChatBox({
         initialize();
     }, []);
 
-    // Fetch messages when component mounts
+    // Fetch messages when component mounts and poll every 5 seconds
     useEffect(() => {
         if (currentUserId && ownerId) {
             fetchMessages();
+            // Polling fallback for real-time updates
+            const pollInterval = setInterval(() => {
+                fetchMessages();
+            }, 5000);
+            return () => clearInterval(pollInterval);
         }
     }, [currentUserId, ownerId, fetchMessages]);
 
@@ -96,6 +104,7 @@ export default function ChatBox({
     useEffect(() => {
         if (!currentUserId || !ownerId) return;
 
+        const supabase = createClient();
         const channel = supabase
             .channel('chatbox-messages')
             .on(
@@ -142,11 +151,28 @@ export default function ChatBox({
         }
 
         setLoading(true);
+        setLoading(true);
         try {
+            // Get CSRF token from cookie with robust parsing
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+                return null;
+            };
+
+            const csrfToken = getCookie('csrf_token');
+            console.log('ChatBox: Sending message with CSRF token:', csrfToken ? 'Found' : 'Missing');
+
+            if (!csrfToken) {
+                console.warn('ChatBox: CSRF token is missing from cookies', document.cookie);
+            }
+
             const response = await fetch('/api/messages', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken || '',
                 },
                 body: JSON.stringify({
                     apartmentId,
@@ -250,9 +276,14 @@ export default function ChatBox({
                                             </p>
                                         )}
                                         <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                                        <p className={`text-xs mt-1 ${isOwnMessage ? 'text-orange-100' : 'text-gray-500'}`}>
-                                            {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
+                                        <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-orange-100' : 'text-gray-500'}`}>
+                                            <span>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            {isOwnMessage && (
+                                                <span className="ml-1">
+                                                    {message.is_read ? '✓✓' : message.is_delivered ? '✓' : '○'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );

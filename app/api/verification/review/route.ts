@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
+import { logger } from '@/lib/logger';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -72,14 +73,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const { data: verification, error } = await supabase
-      .from('verifications')
+      .from('verification')
       .update(updateData)
       .eq('id', verificationId)
       .select()
       .single();
 
     if (error) {
-      console.error('Verification review error:', error);
+      logger.error({ error, verificationId }, 'Verification review update failed');
       return NextResponse.json(
         { success: false, error: 'Failed to update verification' },
         { status: 500 }
@@ -102,7 +103,7 @@ export async function PUT(request: NextRequest) {
       verification,
     });
   } catch (error) {
-    console.error('Verification review error:', error);
+    logger.error({ error }, 'Verification review error');
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

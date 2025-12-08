@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest) {
       action_taken: action,
     });
   } catch (error) {
-    console.error('Error taking moderation action:', error);
+    logger.error({ err: error }, 'Error taking moderation action:');
     return NextResponse.json(
       { error: 'Failed to take moderation action' },
       { status: 500 }

@@ -32,8 +32,8 @@ export function withValidation<T extends z.ZodSchema>(
         }
       } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
         const formData = await req.formData();
-        const data: Record<string, any> = {};
-        for (const [key, value] of (formData as any).entries()) {
+        const data: Record<string, FormDataEntryValue> = {};
+        for (const [key, value] of formData.entries()) {
           data[key] = value;
         }
         body = data;

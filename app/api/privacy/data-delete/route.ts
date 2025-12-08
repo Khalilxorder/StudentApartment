@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
       deletionResults.profile = !error;
     } catch (error) {
-      console.error('Profile deletion error:', error);
+      logger.error({ error, userId }, 'Profile deletion error');
     }
 
     // Delete user's apartments
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
 
       deletionResults.apartments = !error;
     } catch (error) {
-      console.error('Apartments deletion error:', error);
+      logger.error({ error, userId }, 'Apartments deletion error');
     }
 
     // Delete user's reviews
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
       deletionResults.reviews = !error;
     } catch (error) {
-      console.error('Reviews deletion error:', error);
+      logger.error({ error, userId }, 'Reviews deletion error');
     }
 
     // Delete user's messages
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
 
       deletionResults.messages = !error;
     } catch (error) {
-      console.error('Messages deletion error:', error);
+      logger.error({ error, userId }, 'Messages deletion error');
     }
 
     // Delete user's notifications
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
 
       deletionResults.notifications = !error;
     } catch (error) {
-      console.error('Notifications deletion error:', error);
+      logger.error({ error, userId }, 'Notifications deletion error');
     }
 
     // Delete user's saved searches
@@ -119,14 +120,14 @@ export async function POST(req: NextRequest) {
 
       deletionResults.savedSearches = !error;
     } catch (error) {
-      console.error('Saved searches deletion error:', error);
+      logger.error({ error, userId }, 'Saved searches deletion error');
     }
 
     // Note: Auth account deletion should be handled through Supabase Auth
     // This requires special handling and confirmation
 
     // Log the deletion request
-    console.log(`Data deletion requested for user ${userId}:`, deletionResults);
+    logger.info({ userId, deletionResults }, 'Data deletion requested');
 
     // Check if all deletions were successful
     const allSuccessful = Object.values(deletionResults).every(result => result);
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Data deletion error:', error);
+    logger.error({ error }, 'Data deletion error');
     return NextResponse.json(
       { error: 'Failed to process deletion request' },
       { status: 500 }

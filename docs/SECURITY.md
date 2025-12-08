@@ -39,6 +39,7 @@ Security best practices, authentication flows, rate limiting, and hardening.
 - ✅ Rotate `NEXTAUTH_SECRET` regularly
 - ✅ Use HTTPS-only cookies in production
 - ✅ Implement session expiration (default: 24 hours)
+- ✅ **Email verification enforced**: Users must verify email before accessing protected routes
 
 ## CSRF Protection
 
@@ -87,7 +88,8 @@ REDIS_URL=redis://your-redis-host:6379
 
 ### How It Works
 
-- **Default**: 100 requests per 15 minutes per IP
+- **Default**: 300 requests per 15 minutes per IP (general API)
+- **Auth Endpoints** (`/api/auth`, `/login`, `/signup`): **10 requests per 15 minutes** (strict brute-force protection)
 - **Backend**: Uses Redis (distributed) or in-memory (single instance)
 - **Response**: 429 (Too Many Requests) with `Retry-After` header
 
@@ -120,7 +122,7 @@ redis-cli
 ```typescript
 VALIDATION_PATTERNS = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/,  // 12 char minimum
   name: /^[a-zA-Z\s\-']{2,50}$/,
   phone: /^\+?[\d\s\-\(\)]{10,}$/,
   url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/,

@@ -276,7 +276,7 @@ export class MessagingSystemService {
     let encryptedContent = cipher.update(content, 'utf8', 'hex');
     encryptedContent += cipher.final('hex');
 
-    const authTag = (cipher as any).getAuthTag();
+    const authTag = (cipher as crypto.CipherGCM).getAuthTag();
     const combined = iv.toString('hex') + authTag.toString('hex') + encryptedContent;
 
     return {
@@ -299,7 +299,7 @@ export class MessagingSystemService {
       const encrypted = buffer.slice(32);
 
       const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv);
-      (decipher as any).setAuthTag(authTag);
+      (decipher as crypto.DecipherGCM).setAuthTag(authTag);
 
       let decrypted = decipher.update(encrypted);
       decrypted = Buffer.concat([decrypted, decipher.final()]);

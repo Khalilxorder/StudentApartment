@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // GET /api/saved-searches/[id] - Get a specific saved search
 export async function GET(
@@ -42,7 +43,7 @@ export async function GET(
           { status: 404 }
         );
       }
-      console.error('Error fetching saved search:', error);
+      logger.error({ error, searchId: params.id }, 'Error fetching saved search');
       return NextResponse.json(
         { error: 'Failed to fetch saved search' },
         { status: 500 }
@@ -52,7 +53,7 @@ export async function GET(
     return NextResponse.json({ savedSearch });
 
   } catch (error) {
-    console.error('Get saved search error:', error);
+    logger.error({ error, searchId: params.id }, 'Get saved search error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -129,7 +130,7 @@ export async function PUT(
       .single();
 
     if (updateError) {
-      console.error('Error updating saved search:', updateError);
+      logger.error({ updateError, searchId: params.id }, 'Error updating saved search');
       return NextResponse.json(
         { error: 'Failed to update saved search' },
         { status: 500 }
@@ -146,7 +147,7 @@ export async function PUT(
     return NextResponse.json({ savedSearch });
 
   } catch (error) {
-    console.error('Update saved search error:', error);
+    logger.error({ error, searchId: params.id }, 'Update saved search error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -179,7 +180,7 @@ export async function DELETE(
       .eq('user_id', user.id);
 
     if (deleteError) {
-      console.error('Error deleting saved search:', deleteError);
+      logger.error({ deleteError, searchId: params.id }, 'Error deleting saved search');
       return NextResponse.json(
         { error: 'Failed to delete saved search' },
         { status: 500 }
@@ -189,7 +190,7 @@ export async function DELETE(
     return NextResponse.json({ message: 'Saved search deleted successfully' });
 
   } catch (error) {
-    console.error('Delete saved search error:', error);
+    logger.error({ error, searchId: params.id }, 'Delete saved search error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

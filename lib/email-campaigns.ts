@@ -1,5 +1,5 @@
-// FILE: lib/email-campaigns.ts
 import { Resend } from 'resend';
+import { sanitizeHTML } from './sanitize';
 
 interface EmailTemplate {
   id: string;
@@ -41,7 +41,7 @@ class EmailCampaignService {
       this.resend = new Resend(apiKey);
     } else {
       // Mock implementation for build time
-      this.resend = { emails: { send: async () => ({ id: 'mock' }) } } as any;
+      this.resend = { emails: { send: async () => ({ id: 'mock' }) } } as unknown as Resend;
     }
     this.initializeTemplates();
   }
@@ -242,10 +242,15 @@ class EmailCampaignService {
     let text = template.text;
 
     Object.entries(recipient.variables).forEach(([key, value]) => {
+      // Sanitize value to prevent XSS
+      const safeValue = typeof value === 'string' ? sanitizeHTML(value) : String(value);
+
       const regex = new RegExp(`{{${key}}}`, 'g');
-      subject = subject.replace(regex, String(value));
-      html = html.replace(regex, String(value));
-      if (text) text = text.replace(regex, String(value));
+      subject = subject.replace(regex, safeValue);
+      // For HTML, we use the sanitized value
+      html = html.replace(regex, safeValue);
+      // For text, we can use the value as is (or plain text version) but reusing safeValue is fine
+      if (text) text = text.replace(regex, safeValue);
     });
 
     try {

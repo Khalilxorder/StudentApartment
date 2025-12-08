@@ -9,6 +9,7 @@ interface ApartmentDataVisualizationProps {
   bathrooms?: number;
   floorNumber?: number;
   district?: number;
+  minimal?: boolean;
 }
 
 export default function ApartmentDataVisualization({
@@ -17,7 +18,8 @@ export default function ApartmentDataVisualization({
   bedrooms = 0,
   bathrooms = 0,
   floorNumber,
-  district
+  district,
+  minimal = false
 }: ApartmentDataVisualizationProps) {
   // Calculate price per square meter if size is available
   const pricePerSqm = sizeSqm ? Math.round(price / sizeSqm) : null;
@@ -136,26 +138,28 @@ export default function ApartmentDataVisualization({
       </div>
 
       {/* Market Position Summary */}
-      <div className="bg-gradient-to-r from-blue-50 to-orange-50 rounded-lg p-4 border border-blue-200">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-gray-900 mb-1">Market Position</h4>
-            <p className="text-sm text-gray-700">
-              {price < districtAvgPrice * 0.9
-                ? "This property is priced below the district average, representing good value."
-                : price > districtAvgPrice * 1.1
-                ? "This property is priced above the district average, indicating premium positioning."
-                : "This property is priced in line with the district average."
-              }
-            </p>
+      {!minimal && (
+        <div className="bg-gradient-to-r from-blue-50 to-orange-50 rounded-lg p-4 border border-blue-200">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 mb-1">Market Position</h4>
+              <p className="text-sm text-gray-700">
+                {price < districtAvgPrice * 0.9
+                  ? "This property is priced below the district average, representing good value."
+                  : price > districtAvgPrice * 1.1
+                    ? "This property is priced above the district average, indicating premium positioning."
+                    : "This property is priced in line with the district average."
+                }
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

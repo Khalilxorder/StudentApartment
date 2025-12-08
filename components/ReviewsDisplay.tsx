@@ -110,7 +110,10 @@ export default function ReviewsDisplay({
       const data = await response.json();
       setReviews(data.reviews);
       setAnalytics(data.analytics);
-      setTotalPages(data.totalPages);
+      const incomingTotalPages = data.pagination?.totalPages ?? data.totalPages ?? 1;
+      setTotalPages(Math.max(1, incomingTotalPages));
+      // Keep the current page within bounds if the total pages shrank (e.g., after filters)
+      setCurrentPage((prev) => Math.min(prev, Math.max(1, incomingTotalPages)));
     } catch (error) {
       console.error('Error fetching reviews:', error);
       showToast('Failed to load reviews');

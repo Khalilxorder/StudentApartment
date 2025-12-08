@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
+import { logger } from '@/lib/logger';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating payment intent:', error);
+    logger.error({ error }, 'Error creating payment intent');
     return NextResponse.json(
       { error: 'Failed to create payment intent' },
       { status: 500 }
@@ -123,7 +124,7 @@ export async function GET(
     }
 
     // Check current status with Stripe
-  const intent = await stripe.paymentIntents.retrieve(id);
+    const intent = await stripe.paymentIntents.retrieve(id);
 
     return NextResponse.json({
       success: true,
@@ -137,7 +138,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error retrieving payment intent:', error);
+    logger.error({ error }, 'Error retrieving payment intent');
     return NextResponse.json(
       { error: 'Failed to retrieve payment intent' },
       { status: 500 }

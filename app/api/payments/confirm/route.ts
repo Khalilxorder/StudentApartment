@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { getStripe } from '@/lib/stripe/server';
+import { logger } from '@/lib/logger';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -18,7 +19,7 @@ interface ConfirmPaymentRequest {
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase();
-    
+
     const stripe = getStripe();
     if (!stripe) {
       return NextResponse.json(
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       amount: intent.amount / 100,
     });
   } catch (error) {
-    console.error('Error confirming payment:', error);
+    logger.error({ error }, 'Error confirming payment');
     return NextResponse.json(
       { error: 'Failed to confirm payment' },
       { status: 500 }

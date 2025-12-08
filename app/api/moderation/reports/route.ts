@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error('Error fetching reports:', error);
+    logger.error({ err: error }, 'Error fetching reports:');
     return NextResponse.json(
       { error: 'Failed to fetch reports' },
       { status: 500 }
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating report:', error);
+    logger.error({ err: error }, 'Error creating report:');
     return NextResponse.json(
       { error: 'Failed to create report' },
       { status: 500 }

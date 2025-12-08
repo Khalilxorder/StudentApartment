@@ -33,15 +33,14 @@ class CacheService {
     try {
       if (process.env.REDIS_URL) {
         // Dynamically import Redis only if needed
-        // const { Redis } = await import('ioredis');
-        // this.redis = new Redis(process.env.REDIS_URL);
-        // this.redis.on('error', (err: any) => {
-        //   // Suppress connection errors to allow fallback to memory cache
-        //   // console.warn('Redis connection error, using fallback:', err.message);
-        //   this.redis = null;
-        // });
-        // console.log('✅ Redis cache connected');
-        console.warn('⚠️ Redis disabled for build/testing');
+        const { Redis } = await import('ioredis');
+        this.redis = new Redis(process.env.REDIS_URL);
+        this.redis.on('error', (err: any) => {
+          // Suppress connection errors to allow fallback to memory cache
+          console.warn('Redis connection error, using fallback:', err.message);
+          this.redis = null;
+        });
+        console.log('✅ Redis cache connected');
       }
     } catch (error) {
       console.warn('⚠️ Redis not available, using in-memory cache fallback');

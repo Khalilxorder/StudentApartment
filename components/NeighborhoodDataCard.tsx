@@ -55,10 +55,20 @@ export default function NeighborhoodDataCard({ latitude, longitude, address }: N
     const fetchNeighborhoodData = async () => {
       try {
         setLoading(true);
+        // Get CSRF token
+        const getCookie = (name: string) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop()?.split(';').shift();
+          return null;
+        };
+        const csrfToken = getCookie('csrf_token');
+
         const response = await fetch('/api/neighborhood', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken || '',
           },
           body: JSON.stringify({
             latitude,
@@ -275,12 +285,11 @@ export default function NeighborhoodDataCard({ latitude, longitude, address }: N
             </div>
             <div>
               <span className="text-sm text-gray-600">Trend</span>
-              <div className={`text-lg font-semibold ${
-                data.priceTrends.trend === 'up' ? 'text-red-600' :
-                data.priceTrends.trend === 'down' ? 'text-green-600' : 'text-gray-600'
-              }`}>
+              <div className={`text-lg font-semibold ${data.priceTrends.trend === 'up' ? 'text-red-600' :
+                  data.priceTrends.trend === 'down' ? 'text-green-600' : 'text-gray-600'
+                }`}>
                 {data.priceTrends.trend === 'up' ? '↗️ Rising' :
-                 data.priceTrends.trend === 'down' ? '↘️ Falling' : '➡️ Stable'}
+                  data.priceTrends.trend === 'down' ? '↘️ Falling' : '➡️ Stable'}
                 ({data.priceTrends.changePercent > 0 ? '+' : ''}{data.priceTrends.changePercent}%)
               </div>
             </div>

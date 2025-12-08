@@ -55,24 +55,31 @@ export function getMapsConfig(options: MapsConfigOptions = {}): MapsConfigResult
 	const warnings: string[] = [];
 	const errors: string[] = [];
 
-		const rawKey = process.env.NEXT_PUBLIC_MAPS_API_KEY ?? '';
-		let apiKey = rawKey.trim();
+	// Accept both correctly and incorrectly cased env vars to avoid silent failures
+	const envKeys = Object.keys(process.env);
+	const lowercaseTarget = 'next_public_maps_api_key';
+	const hasCanonicalKey = envKeys.includes('NEXT_PUBLIC_MAPS_API_KEY');
+	const hasIncorrectlyCasedKey = envKeys.some(
+		(key) => key !== 'NEXT_PUBLIC_MAPS_API_KEY' && key.toLowerCase() === lowercaseTarget
+	);
 
-		const envKeys = Object.keys(process.env);
-		const lowercaseTarget = 'next_public_maps_api_key';
-		const hasCanonicalKey = envKeys.includes('NEXT_PUBLIC_MAPS_API_KEY');
-		const hasIncorrectlyCasedKey = envKeys.some(
-			(key) => key !== 'NEXT_PUBLIC_MAPS_API_KEY' && key.toLowerCase() === lowercaseTarget
-		);
+	// Prefer the canonical var, but gracefully fall back to the mis-cased one if that's all we have
+	const rawKey =
+		process.env.NEXT_PUBLIC_MAPS_API_KEY ??
+		(!hasCanonicalKey ? process.env.NEXT_PUBLIC_Maps_API_KEY : '') ??
+		'';
+	let apiKey = rawKey.trim();
 
-		if (hasIncorrectlyCasedKey) {
-			if (!hasCanonicalKey) {
-				apiKey = '';
-				warnings.push(DEPRECATED_ENV_WARNING);
-			} else {
-				warnings.push(`${DEPRECATED_ENV_WARNING} Remove the legacy variable to avoid confusion.`);
-			}
+	if (hasIncorrectlyCasedKey) {
+		if (!hasCanonicalKey && apiKey) {
+			warnings.push(DEPRECATED_ENV_WARNING);
+		} else if (!hasCanonicalKey) {
+			apiKey = '';
+			warnings.push(DEPRECATED_ENV_WARNING);
+		} else {
+			warnings.push(`${DEPRECATED_ENV_WARNING} Remove the legacy variable to avoid confusion.`);
 		}
+	}
 
 	if (!apiKey) {
 		const message = MISSING_API_KEY_ERROR;

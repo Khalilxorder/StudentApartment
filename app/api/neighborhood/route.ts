@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 // FILE: app/api/neighborhood/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -48,7 +50,7 @@ async function getWalkScoreData(latitude: number, longitude: number): Promise<Pa
   try {
     const WALKSCORE_API_KEY = process.env.WALKSCORE_API_KEY;
     if (!WALKSCORE_API_KEY) {
-      console.warn('Walk Score API key not configured');
+      logger.warn({}, 'Walk Score API key not configured');
       return {};
     }
 
@@ -57,7 +59,7 @@ async function getWalkScoreData(latitude: number, longitude: number): Promise<Pa
     );
 
     if (!response.ok) {
-      console.warn('Walk Score API request failed:', response.status);
+      logger.warn({ status: response.status }, 'Walk Score API request failed');
       return {};
     }
 
@@ -80,7 +82,7 @@ async function getWalkScoreData(latitude: number, longitude: number): Promise<Pa
       } : undefined,
     };
   } catch (error) {
-    console.error('Error fetching Walk Score data:', error);
+    logger.error({ err: error }, 'Error fetching Walk Score data');
     return {};
   }
 }
@@ -89,7 +91,7 @@ async function getGooglePlacesData(latitude: number, longitude: number): Promise
   try {
     const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
     if (!GOOGLE_PLACES_API_KEY) {
-      console.warn('Google Places API key not configured');
+      logger.warn({}, 'Google Places API key not configured');
       return {};
     }
 
@@ -120,7 +122,7 @@ async function getGooglePlacesData(latitude: number, longitude: number): Promise
           nearbyAmenities[key] = 0;
         }
       } catch (error) {
-        console.error(`Error fetching ${type} data:`, error);
+        logger.error({ err: error, type }, `Error fetching ${type} data`);
         nearbyAmenities[key] = 0;
       }
     });
@@ -128,10 +130,10 @@ async function getGooglePlacesData(latitude: number, longitude: number): Promise
     await Promise.all(promises);
 
     return {
-      nearbyAmenities: nearbyAmenities as any,
+      nearbyAmenities: nearbyAmenities as NeighborhoodData['nearbyAmenities'],
     };
   } catch (error) {
-    console.error('Error fetching Google Places data:', error);
+    logger.error({ err: error }, 'Error fetching Google Places data');
     return {
       nearbyAmenities: {
         restaurants: 0,
@@ -203,7 +205,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Neighborhood API error:', error);
+    logger.error({ err: error }, 'Neighborhood API error');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

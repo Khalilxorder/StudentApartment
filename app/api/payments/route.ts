@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabaseClient';
 import { paymentsService } from '@/services/payments-svc';
 import { z } from 'zod';
 import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 // Booking creation schema
 const bookingRequestSchema = z.object({
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Booking creation error:', error);
+    logger.error({ error }, 'Booking creation error');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ booking });
 
   } catch (error) {
-    console.error('Get booking error:', error);
+    logger.error({ error, bookingId: request.nextUrl.searchParams.get('bookingId') }, 'Get booking error');
     return NextResponse.json(
       { error: 'Failed to get booking' },
       { status: 500 }
@@ -137,7 +138,7 @@ export async function PUT(request: NextRequest) {
 
     // Verify webhook signature
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: '2025-10-29.clover',
+      apiVersion: '2024-11-20.acacia' as Stripe.LatestApiVersion,
     });
 
     let event: Stripe.Event;
@@ -149,7 +150,7 @@ export async function PUT(request: NextRequest) {
         process.env.STRIPE_WEBHOOK_SECRET!
       );
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      logger.error({ err }, 'Webhook signature verification failed');
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400 }
@@ -162,7 +163,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ received: true });
 
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logger.error({ error }, 'Webhook processing error');
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

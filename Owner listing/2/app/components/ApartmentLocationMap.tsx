@@ -23,7 +23,7 @@ export default function ApartmentLocationMap({
   title
 }: ApartmentLocationMapProps) {
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_Maps_API_KEY || '',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_MAPS_API_KEY || '',
   });
 
   if (!isLoaded) {

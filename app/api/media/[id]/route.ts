@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 
@@ -32,7 +34,7 @@ export async function GET(
       media: data,
     });
   } catch (error) {
-    console.error('Error fetching media:', error);
+    logger.error({ err: error }, 'Error fetching media:');
     return NextResponse.json(
       { error: 'Failed to fetch media' },
       { status: 500 }
@@ -74,8 +76,7 @@ export async function DELETE(
         .remove([media.storage_path]);
 
       if (storageError) {
-        console.warn('Failed to delete from storage:', storageError);
-        // Continue anyway, delete DB record
+        logger.warn({ error: storageError }, 'Failed to delete from storage');
       }
     }
 
@@ -106,7 +107,7 @@ export async function DELETE(
       message: 'Media deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting media:', error);
+    logger.error({ err: error }, 'Error deleting media:');
     return NextResponse.json(
       { error: 'Failed to delete media' },
       { status: 500 }

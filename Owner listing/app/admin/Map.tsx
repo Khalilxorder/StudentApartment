@@ -19,7 +19,7 @@ const libraries: ("places" | "marker")[] = ["places", "marker"];
 export default function Map({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_Maps_API_KEY!,
+    googleMapsApiKey: process.env.NEXT_PUBLIC_MAPS_API_KEY!,
     libraries,
   });
 

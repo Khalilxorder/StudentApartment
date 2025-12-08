@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 /**
  * POST /api/payments/stripe/connect/[userId]
  * Start Stripe Connect onboarding for an owner
@@ -89,7 +91,7 @@ export async function POST(
       accountId: stripeAccountId,
     });
   } catch (error) {
-    console.error('Error initiating Stripe Connect:', error);
+    logger.error({ err: error }, 'Error initiating Stripe Connect:');
     return NextResponse.json(
       { error: 'Failed to initiate Stripe Connect onboarding' },
       { status: 500 }
@@ -166,7 +168,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error checking Stripe Connect status:', error);
+    logger.error({ err: error }, 'Error checking Stripe Connect status:');
     return NextResponse.json(
       { error: 'Failed to check Stripe Connect status' },
       { status: 500 }

@@ -52,6 +52,7 @@ import { z } from 'zod';
 import { batchScoringService } from '@/services/batch-scoring-svc';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/dev-logger';
 
 const batchRequestSchema = z.object({
   apartments: z.array(
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[BatchScoringAPI] Scoring', apartments.length, 'apartments for user', user.id);
+    logger.info({ count: apartments.length, userId: user.id }, '[BatchScoringAPI] Scoring apartments');
 
     // Score the batch
     const result = await batchScoringService.scoreApartmentBatch(
@@ -156,8 +157,14 @@ export async function POST(request: NextRequest) {
     // Log circuit breaker status
     const cbStatus = batchScoringService.getCircuitBreakerStatus();
     if (cbStatus.isOpen) {
-      console.warn('[BatchScoringAPI] Circuit breaker is OPEN - limited availability');
+      logger.warn('[BatchScoringAPI] Circuit breaker is OPEN - limited availability');
     }
+
+    logger.info({
+      successful: result.successful,
+      failed: result.failed,
+      duration: totalTime
+    }, '[BatchScoringAPI] Batch scoring complete');
 
     return NextResponse.json({
       success: true,
@@ -175,11 +182,11 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     const totalTime = Date.now() - startTime;
 
-    console.error('[BatchScoringAPI] Error:', {
+    logger.error({
       message: error?.message,
       code: error?.code,
       totalMs: totalTime,
-    });
+    }, '[BatchScoringAPI] Error');
 
     return NextResponse.json(
       {

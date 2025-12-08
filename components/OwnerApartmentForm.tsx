@@ -2,28 +2,16 @@
 
 import { useRef, useState, useTransition } from 'react';
 import type { Apartment } from '@/types/apartment';
+import { createClient } from '@/utils/supabaseClient';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { addApartment, updateApartment } from '@/app/(admin)/admin/actions';
-import Map from '@/app/(admin)/admin/Map';
-import { SortableImage } from '@/app/(admin)/admin/SortableImage';
-import { PriceValidationHint } from '@/components/PriceValidationHint';
+import { addApartment, updateApartment } from '@/app/[locale]/(admin)/admin/actions';
+import Map from '@/app/[locale]/(admin)/admin/Map';
+import { MultiFileUploader } from '@/components/MultiFileUploader';
+import { GalleryImage } from '@/components/ImageGallery';
+import { useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 import { QuickDraftForm } from '@/components/QuickDraftForm';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  horizontalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { supabase } from '@/utils/supabaseClient';
+import { PriceValidationHint } from '@/components/PriceValidationHint';
 
 type InitialData = Partial<Apartment> & {
   privacy_level?: string;
@@ -35,6 +23,7 @@ type InitialData = Partial<Apartment> & {
 };
 
 export default function OwnerApartmentForm({ initialData }: { initialData?: InitialData }) {
+  const supabase = createClient();
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,8 +44,29 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
   });
 
   const [features, setFeatures] = useState<string[]>(initialData?.features ?? []);
-  const [imageUrls, setImageUrls] = useState<string[]>(initialData?.image_urls ?? []);
-  const [uploading, setUploading] = useState(false);
+
+  const handleRoomCountChange = (room: string, count: number) => {
+    setRoomCounts(prev => ({ ...prev, [room]: count }));
+  };
+
+  const handleFeatureToggle = (feature: string) => {
+    setFeatures(prev =>
+      prev.includes(feature)
+        ? prev.filter(f => f !== feature)
+        : [...prev, feature]
+    );
+  };
+
+  // Initialize with proper GalleryImage shape
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>(
+    (initialData?.image_urls ?? []).map((url, idx) => ({
+      id: url,
+      url: url,
+      status: 'complete',
+      isCover: idx === 0
+    }))
+  );
+
   const [isAvailable, setIsAvailable] = useState<boolean>(initialData?.is_available ?? true);
   const hasInitialCoordinates =
     typeof initialData?.latitude === 'number' &&
@@ -77,63 +87,6 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
     useSensor(KeyboardSensor)
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setImageUrls((items) => {
-        const oldIndex = items.indexOf(active.id as string);
-        const newIndex = items.indexOf(over.id as string);
-
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
-  };
-
-  const handleRoomCountChange = (roomType: string, count: number) => {
-    setRoomCounts(prev => ({ ...prev, [roomType]: count }));
-  };
-
-  const handleFeatureToggle = (feature: string) => {
-    setFeatures(prev =>
-      prev.includes(feature)
-        ? prev.filter(f => f !== feature)
-        : [...prev, feature]
-    );
-  };
-
-  const handleImageUpload = async (files: FileList) => {
-    setUploading(true);
-    try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Use the media API for processing instead of direct Supabase upload
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('type', 'apartment');
-
-        const response = await fetch('/api/media/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        console.log('Uploaded image URL:', result.url);
-        return result.url; // The processed image URL
-      });
-
-      const urls = await Promise.all(uploadPromises);
-      setImageUrls(prev => [...prev, ...urls]);
-    } catch (error) {
-      console.error('Error uploading images:', error);
-      alert('Error uploading images. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -162,14 +115,14 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
         }
 
         // Validate quality photo requirements
-        if (imageUrls.length < 3) {
+        if (galleryImages.length < 3) {
           alert('Please upload at least 3 quality photos before publishing your listing.');
           return;
         }
 
         // Check if photos have been processed
-        const processedPhotos = imageUrls.filter(url => url && url.length > 0);
-        if (processedPhotos.length < 3) {
+        const completedImages = galleryImages.filter(img => img.status === 'complete');
+        if (completedImages.length < 3) {
           alert('Please wait for photo processing to complete before publishing.');
           return;
         }
@@ -218,9 +171,11 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
         // Availability
         formData.append('is_available', String(isAvailable));
 
-        // Add images
-        imageUrls.forEach(url => {
-          formData.append('image_urls', url);
+        // Add images (ordered by galleryImages which handles sorting)
+        galleryImages.forEach(img => {
+          if (img.status === 'complete' && img.url) {
+            formData.append('image_urls', img.url);
+          }
         });
 
         // Add features
@@ -440,83 +395,19 @@ export default function OwnerApartmentForm({ initialData }: { initialData?: Init
 
           {/* RIGHT COLUMN */}
           <div className="space-y-6 lg:sticky lg:top-24">
-            {/* Images Section matching sketch */}
+            {/* Images Section */}
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Photos</h3>
-                <span className="text-xs text-gray-500">{imageUrls.length} uploaded</span>
+                <span className="text-xs text-gray-500">{galleryImages.length} uploaded</span>
               </div>
 
-              {/* Main Hero Image Placeholder */}
-              <div className="aspect-video bg-gray-200 rounded-lg mb-4 overflow-hidden relative group shadow-sm">
-                {imageUrls.length > 0 ? (
-                  <Image src={imageUrls[0]} alt="Main" fill className="object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-100">
-                    <svg className="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-sm">Main listing photo</span>
-                  </div>
-                )}
-                {imageUrls.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setImageUrls(prev => prev.filter((_, i) => i !== 0))}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition shadow-md hover:bg-red-600"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                )}
-              </div>
-
-              {/* Scrollable Thumbnails Row */}
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                {/* Existing Thumbnails */}
-                {imageUrls.map((url, idx) => (
-                  <div key={`${url}-${idx}`} className={`flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden relative group border-2 ${idx === 0 ? 'border-blue-500' : 'border-transparent'}`}>
-                    <Image src={url} alt={`Thumbnail ${idx}`} fill className="object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setImageUrls(prev => prev.filter((_, i) => i !== idx))}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition shadow-sm"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                    {idx === 0 && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-blue-500/80 text-white text-[10px] text-center py-0.5 font-medium">
-                        Main
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Add Button */}
-                <label className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition text-gray-500 hover:text-blue-600">
-                  <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="text-xs font-medium">Add Photo</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => e.target.files && handleImageUpload(e.target.files)}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              {uploading && (
-                <div className="mt-2 flex items-center justify-center gap-2 text-sm text-blue-600 bg-blue-50 p-2 rounded-lg">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  Uploading...
-                </div>
-              )}
-
-              <p className="text-xs text-gray-500 mt-2">
-                Tip: The first photo will be your main listing image. Drag and drop support coming soon.
-              </p>
+              <MultiFileUploader
+                apartmentId={initialData?.id}
+                existingImages={galleryImages}
+                onImagesChange={setGalleryImages}
+                maxImages={20}
+              />
             </div>
 
             {/* Map Section */}

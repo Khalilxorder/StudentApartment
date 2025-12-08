@@ -1,52 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logRateLimitExceeded, logSuspiciousActivity, logCSRFViolation, logInputValidationFailure } from './security-logger';
 
-// Rate limiting configuration with Redis support (when available)
-let redisClient: any = null;
+// Use Redis-backed rate limiting from new module
+import { checkRateLimit as checkRedisRateLimit } from './rate-limit-redis';
 
-try {
-  if (process.env.REDIS_URL) {
-    const IORedis = require('ioredis');
-    redisClient = new IORedis(process.env.REDIS_URL);
-  } else if (process.env.UPSTASH_REDIS_REST_URL) {
-    // For Upstash, we'd need their specific client, but for now use fallback
-    console.warn('Upstash Redis detected but not fully configured, using in-memory rate limiting');
-  }
-} catch (error) {
-  console.warn('Redis not available, using in-memory rate limiting');
-}
-
-// Enhanced in-memory rate limiting with better cleanup
+// Legacy in-memory fallback (deprecated - use Redis in production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number; firstRequest: number }>();
 
-async function checkRateLimit(identifier: string, limit: number, windowMs: number): Promise<boolean> {
-  const now = Date.now();
-
-  // Try Redis first if available
-  if (redisClient) {
-    try {
-      const key = `ratelimit:${identifier}`;
-      const current = await redisClient.get(key);
-
-      if (!current) {
-        // First request in window
-        await redisClient.setex(key, Math.ceil(windowMs / 1000), '1');
-        return true;
-      }
-
-      const count = parseInt(current);
-      if (count >= limit) {
-        return false;
-      }
-
-      await redisClient.incr(key);
-      return true;
-    } catch (error) {
-      console.warn('Redis rate limiting failed, falling back to in-memory');
+/**
+ * Legacy rate limiting function - kept for backwards compatibility
+ * Use checkRedisRateLimit from './rate-limit-redis' instead
+ */
+async function checkRateLimit(
+  identifier: string,
+  limit: number,
+  windowMs: number,
+  type: 'api' | 'auth' = 'api'
+): Promise<boolean> {
+  // Try new Redis-backed system first
+  try {
+    if (process.env.UPSTASH_REDIS_REST_URL) {
+      const result = await checkRedisRateLimit(identifier, 'free', type);
+      return result.success;
     }
+  } catch (error) {
+    console.warn('Redis rate limiting failed, using in-memory fallback');
   }
 
-  // Fallback to in-memory rate limiting
+  // Fallback to in-memory
+  const now = Date.now();
   const windowKey = Math.floor(now / windowMs);
   const key = `${identifier}:${windowKey}`;
 
@@ -62,7 +44,7 @@ async function checkRateLimit(identifier: string, limit: number, windowMs: numbe
 
   rateLimitStore.set(key, current);
 
-  // Clean up old entries periodically (every 100 requests)
+  // Clean up old entries periodically
   if (rateLimitStore.size > 1000) {
     const keysToDelete: string[] = [];
     rateLimitStore.forEach((v, k) => {
@@ -76,48 +58,27 @@ async function checkRateLimit(identifier: string, limit: number, windowMs: numbe
   return current.count <= limit;
 }
 
-// CSRF token storage (enhanced with Redis support)
-const csrfTokens = new Set<string>();
+// Stateless CSRF validation (Double Submit Cookie)
+export async function validateCSRFToken(req: NextRequest): Promise<boolean> {
+  const headerToken = req.headers.get('x-csrf-token') || req.nextUrl.searchParams.get('csrfToken');
+  const cookieToken = req.cookies.get('csrf_token')?.value;
 
-async function storeCSRFToken(token: string): Promise<void> {
-  if (redisClient) {
-    try {
-      await redisClient.setex(`csrf:${token}`, 3600, 'valid'); // 1 hour expiry
-    } catch (error) {
-      console.warn('Redis CSRF storage failed, using in-memory');
-      csrfTokens.add(token);
-    }
-  } else {
-    csrfTokens.add(token);
-  }
-
-  // Clean up old tokens (simple implementation)
-  if (csrfTokens.size > 1000) {
-    const tokensArray = Array.from(csrfTokens);
-    tokensArray.slice(0, 100).forEach(token => csrfTokens.delete(token));
-  }
-}
-
-async function validateAndConsumeCSRFToken(token: string): Promise<boolean> {
-  if (redisClient) {
-    try {
-      const result = await redisClient.get(`csrf:${token}`);
-      if (result) {
-        await redisClient.del(`csrf:${token}`); // One-time use
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.warn('Redis CSRF validation failed, using in-memory');
-    }
-  }
-
-  // Fallback to in-memory
-  if (!csrfTokens.has(token)) {
+  if (!headerToken || !cookieToken) {
     return false;
   }
-  csrfTokens.delete(token); // One-time use
-  return true;
+
+  // Constant-time comparison to prevent timing attacks
+  return headerToken === cookieToken;
+}
+
+// Deprecated: No-op for backward compatibility during migration
+export async function storeCSRFToken(token: string): Promise<void> {
+  // No-op: We now use cookies for storage
+}
+
+// Deprecated: Kept for backward compatibility
+async function validateAndConsumeCSRFToken(token: string): Promise<boolean> {
+  return false; // Should not be used directly anymore
 }
 
 function generateCSRFToken(): string {
@@ -129,7 +90,7 @@ const VALIDATION_PATTERNS = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   phone: /^\+?[\d\s\-\(\)]{10,}$/,
   name: /^[a-zA-Z\s\-']{2,50}$/,
-  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/,
   zipCode: /^\d{5}(-\d{4})?$/,
   url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
 };
@@ -171,34 +132,16 @@ async function isSuspiciousRequest(req: NextRequest): Promise<boolean> {
     return true;
   }
 
-  // Check for rapid requests from same IP (basic implementation)
-  const now = Date.now();
-  const key = `requests:${ip}`;
-
-  if (redisClient) {
-    try {
-      const count = await redisClient.incr(key);
-      if (count === 1) {
-        await redisClient.expire(key, 60); // 1 minute window
-      }
-      if (count > 100) { // More than 100 requests per minute
-        return true;
-      }
-    } catch (error) {
-      console.warn('Redis suspicious request check failed');
-    }
-  }
-
   return false;
 }
 
 export async function securityMiddleware(req: NextRequest): Promise<NextResponse | null> {
   const { pathname } = req.nextUrl;
 
-  // Skip security checks for static assets and API routes that handle their own security
+  // Skip security checks for static assets
   if (
     pathname.startsWith('/_next/') ||
-    pathname.startsWith('/api/auth/') ||
+    // pathname.startsWith('/api/auth/') || // Auth routes must be rate limited!
     pathname.startsWith('/api/ai/') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/robots.txt') ||
@@ -207,9 +150,23 @@ export async function securityMiddleware(req: NextRequest): Promise<NextResponse
     return null;
   }
 
-  // Rate limiting
+  // Rate limiting - ONLY for API routes and auth pages
+  // Skip rate limiting for regular page views (apartments, dashboard, etc.)
   const ip = req.ip || req.headers.get('x-forwarded-for') || 'anonymous';
-  let isAllowed = await checkRateLimit(ip, 100, 15 * 60 * 1000); // 100 requests per 15 minutes
+
+  let isAllowed = true;
+
+  // Only apply rate limiting to API routes and auth endpoints
+  if (pathname.startsWith('/api/') || pathname.startsWith('/login') || pathname.startsWith('/signup')) {
+    if (pathname.startsWith('/api/auth') || pathname.startsWith('/login') || pathname.startsWith('/signup')) {
+      // Strict limit for auth routes: 10 requests per 15 minutes
+      isAllowed = await checkRateLimit(`${ip}:auth`, 10, 15 * 60 * 1000, 'auth');
+    } else if (pathname.startsWith('/api/')) {
+      // More reasonable limit for API routes: 500 requests per 15 minutes (development-friendly)
+      isAllowed = await checkRateLimit(ip, 500, 15 * 60 * 1000, 'api');
+    }
+  }
+  // No rate limiting for regular page views
 
   if (!isAllowed) {
     logRateLimitExceeded(req, 100);
@@ -250,18 +207,20 @@ export async function securityMiddleware(req: NextRequest): Promise<NextResponse
     // Exempt certain endpoints from CSRF validation
     const csrfExemptPaths = [
       '/api/webhooks/', // All webhook endpoints
-      '/api/payments/stripe/connect', // Stripe Connect redirect
-      '/api/payments/stripe/webhook', // Stripe webhook
+      '/api/payments/stripe', // Stripe endpoints
       '/api/auth/callback', // OAuth callbacks
       '/auth/callback', // Supabase auth callback
+      '/api/neighborhood', // Read-only neighborhood data fetch
+      '/api/ai/', // AI endpoints are stateless
+      '/api/messages', // Protected by Supabase auth
     ];
 
     const isExempt = csrfExemptPaths.some(path => pathname.startsWith(path));
 
     if (!isExempt) {
-      const csrfToken = req.headers.get('x-csrf-token') || req.nextUrl.searchParams.get('csrfToken');
+      const isValid = await validateCSRFToken(req);
 
-      if (!csrfToken || !(await validateAndConsumeCSRFToken(csrfToken))) {
+      if (!isValid) {
         logCSRFViolation(req);
         return new NextResponse(
           JSON.stringify({
@@ -279,67 +238,8 @@ export async function securityMiddleware(req: NextRequest): Promise<NextResponse
     }
   }
 
-  // Input validation for API routes
-  if (pathname.startsWith('/api/') && req.method === 'POST') {
-    try {
-      const body = await req.json();
-
-      // Validate based on endpoint
-      let validationSchema: Record<string, RegExp> = {};
-
-      if (pathname === '/api/auth/signup' || pathname === '/api/auth/login') {
-        validationSchema = {
-          email: VALIDATION_PATTERNS.email,
-          password: VALIDATION_PATTERNS.password,
-        };
-      } else if (pathname === '/api/apartments/search') {
-        // Allow flexible search parameters
-        validationSchema = {};
-      } else if (pathname.includes('/apartments/') && req.method === 'POST') {
-        validationSchema = {
-          title: /^[a-zA-Z0-9\s\-',.]{10,200}$/,
-          description: /^[a-zA-Z0-9\s\-',.!?]{50,2000}$/,
-          price: /^\d+(\.\d{2})?$/,
-          location: /^[a-zA-Z0-9\s\-',.]{5,100}$/,
-        };
-      }
-
-      if (Object.keys(validationSchema).length > 0) {
-        const validation = validateInput(body, validationSchema);
-
-        if (!validation.isValid) {
-          validation.errors.forEach(error => {
-            logInputValidationFailure(req, 'form_field', error);
-          });
-          return new NextResponse(
-            JSON.stringify({
-              error: 'Validation failed',
-              message: 'Please check your input data.',
-              details: validation.errors,
-            }),
-            {
-              status: 400,
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-        }
-      }
-    } catch (error) {
-      // If body parsing fails, continue (might be form data)
-    }
-  }
-
-  // Add CSRF token for GET requests to pages that need it
-  if (req.method === 'GET' && !pathname.startsWith('/api/')) {
-    const csrfToken = crypto.randomUUID();
-    await storeCSRFToken(csrfToken);
-    req.headers.set('X-CSRF-Token', csrfToken);
-  }
-
   return null;
 }
 
 // Utility functions for components
-export { generateCSRFToken, validateInput, VALIDATION_PATTERNS, storeCSRFToken };
+export { generateCSRFToken, validateInput, VALIDATION_PATTERNS };

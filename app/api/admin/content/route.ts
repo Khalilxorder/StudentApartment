@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabaseClient';
 
@@ -26,13 +28,13 @@ export async function GET() {
       .order('flagged_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching content moderation items:', error);
+      logger.error({ err: error }, 'Error fetching content moderation items:');
       return NextResponse.json({ error: 'Failed to fetch content items' }, { status: 500 });
     }
 
     return NextResponse.json({ contentItems });
   } catch (error) {
-    console.error('Error in content moderation API:', error);
+    logger.error({ err: error }, 'Error in content moderation API:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -57,7 +59,7 @@ export async function PATCH(request: NextRequest) {
       .eq('id', contentId);
 
     if (moderationError) {
-      console.error('Error updating content moderation:', moderationError);
+      logger.error({ err: moderationError }, 'Error updating content moderation:');
       return NextResponse.json({ error: 'Failed to update content moderation' }, { status: 500 });
     }
 
@@ -76,7 +78,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in content moderation PATCH:', error);
+    logger.error({ err: error }, 'Error in content moderation PATCH:');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

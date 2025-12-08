@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Data export error:', error);
+    logger.error({ error }, 'Data export error');
     return NextResponse.json(
       { error: 'Failed to export data' },
       { status: 500 }
@@ -156,7 +157,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Export status check error:', error);
+    logger.error({ error }, 'Export status check error');
     return NextResponse.json(
       { error: 'Failed to check export status' },
       { status: 500 }

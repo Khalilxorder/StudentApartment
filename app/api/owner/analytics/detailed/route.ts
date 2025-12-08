@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -158,7 +160,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Analytics error:', error);
+    logger.error({ err: error }, 'Analytics error:');
     return NextResponse.json(
       { error: 'Failed to load analytics' },
       { status: 500 }

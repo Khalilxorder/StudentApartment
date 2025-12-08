@@ -3,7 +3,70 @@ import { createClient } from '@/lib/supabase/server';
 import { cache, cacheHelpers } from '@/lib/cache';
 import { rateLimiter } from '@/lib/rate-limit';
 import { maskContactInfo } from '@/lib/messaging';
+import { logger } from '@/lib/logger';
 
+interface Conversation {
+  id: string;
+  apartment_id: string;
+  student_id: string;
+  owner_id: string;
+  status: string;
+  last_message_at: string;
+  last_message_preview: string | null;
+  unread_count_student: number;
+  unread_count_owner: number;
+  created_at: string;
+  apartment: {
+    id: string;
+    title: string;
+    address: string;
+    monthly_rent_huf: number;
+  }[] | null; // Supabase returns array for joins
+}
+
+/**
+ * @swagger
+ * /api/messages:
+ *   get:
+ *     summary: Get conversations or messages
+ *     description: Retrieves user conversations or messages for a specific conversation
+ *     tags: [Messages]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: conversationId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Get messages for specific conversation
+ *       - in: query
+ *         name: unreadOnly
+ *         schema:
+ *           type: boolean
+ *         description: Get only unread count
+ *     responses:
+ *       200:
+ *         description: Conversations or messages retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     conversations:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                 - type: object
+ *                   properties:
+ *                     messages:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Message'
+ *       401:
+ *         description: Unauthorized
+ */
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient();
@@ -26,7 +89,7 @@ export async function GET(request: NextRequest) {
         .is('read_at', null);
 
       if (error) {
-        console.error('Unread count error:', error);
+        logger.error({ error, userId: user.id }, 'Unread count error');
         return NextResponse.json({ error: 'Failed to fetch unread count' }, { status: 500 });
       }
 
@@ -50,7 +113,7 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Messages fetch error:', error);
+        logger.error({ error, conversationId }, 'Messages fetch error');
         return NextResponse.json(
           { error: 'Failed to fetch messages', details: error.message },
           { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -97,7 +160,7 @@ export async function GET(request: NextRequest) {
         .order('last_message_at', { ascending: false });
 
       if (error) {
-        console.error('Conversations fetch error:', error);
+        logger.error({ error, userId: user.id }, 'Conversations fetch error');
         return NextResponse.json(
           { error: 'Failed to fetch conversations', details: error.message },
           { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -106,7 +169,7 @@ export async function GET(request: NextRequest) {
 
       // Get other participant info for each conversation
       const conversationsWithParticipants = await Promise.all(
-        (conversations || []).map(async (conv: any) => {
+        (conversations || []).map(async (conv) => {
           const isStudent = conv.student_id === user.id;
           const otherUserId = isStudent ? conv.owner_id : conv.student_id;
           const otherUserRole = isStudent ? 'owner' : 'student';
@@ -127,7 +190,7 @@ export async function GET(request: NextRequest) {
           return {
             id: conv.id,
             apartmentId: conv.apartment_id,
-            apartment: conv.apartment,
+            apartment: Array.isArray(conv.apartment) && conv.apartment.length > 0 ? conv.apartment[0] : null,
             otherUserId,
             otherUserRole,
             otherUser: {
@@ -156,7 +219,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Messages API error:', error);
+    logger.error({ error }, 'Messages API error');
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -164,6 +227,53 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * @swagger
+ * /api/messages:
+ *   post:
+ *     summary: Send a message
+ *     description: Sends a message in a conversation
+ *     tags: [Messages]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [receiverId, content]
+ *             properties:
+ *               conversationId:
+ *                 type: string
+ *                 format: uuid
+ *               receiverId:
+ *                 type: string
+ *                 format: uuid
+ *               content:
+ *                 type: string
+ *                 example: "I'm interested in viewing this apartment"
+ *               apartmentId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Required if starting new conversation
+ *     responses:
+ *       200:
+ *         description: Message sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   $ref: '#/components/schemas/Message'
+ *       400:
+ *         description: Missing required fields
+ *       401:
+ *         description: Unauthorized
+ *       429:
+ *         description: Rate limit exceeded
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient();
@@ -228,7 +338,7 @@ export async function POST(request: NextRequest) {
         });
 
       if (convError || !newConversationId) {
-        console.error('Conversation creation error:', convError);
+        logger.error({ convError, apartmentId }, 'Conversation creation error');
         return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 });
       }
 
@@ -273,7 +383,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('Message insert error:', insertError);
+      logger.error({ insertError, conversationId: finalConversationId }, 'Message insert error');
       return NextResponse.json({ error: 'Failed to send message', details: insertError.message }, { status: 500 });
     }
 
@@ -285,7 +395,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message });
 
   } catch (error) {
-    console.error('Send message error:', error);
+    logger.error({ error }, 'Send message error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

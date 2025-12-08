@@ -6,6 +6,8 @@ import { supabase } from '@/utils/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 import UserProfileDropdown from './UserProfileDropdown';
 import MobileMenu from './MobileMenu';
+import LanguageSwitcher from './LanguageSwitcher';
+import { useTranslations } from 'next-intl';
 
 type UserRole = 'student' | 'owner' | 'admin';
 
@@ -57,8 +59,15 @@ export default function UserAuthStatus() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const t = useTranslations('Navigation');
+
+  // Handle mounting to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // Get initial session
@@ -112,17 +121,20 @@ export default function UserAuthStatus() {
     window.location.href = '/';
   };
 
-  if (loading) {
+  // Show skeleton during SSR and initial hydration to prevent mismatch
+  if (!mounted || loading) {
     return (
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
-          <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-            <Logo className="h-10 w-auto" />
-            <h1 className="text-gray-900 font-bold text-lg">Student Apartments</h1>
-          </a>
-          <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
+      <>
+        <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
+              <Logo className="h-10 w-auto" />
+              <h1 className="text-gray-900 font-bold text-lg">Student Apartments</h1>
+            </a>
+            <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -132,28 +144,32 @@ export default function UserAuthStatus() {
         <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
           <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
             <Logo className="h-10 w-auto" />
-            <h1 className="text-gray-900 font-bold text-lg">Student Apartments</h1>
+            <h1 className="text-gray-900 font-bold text-lg">{t('appName')}</h1>
           </a>
 
 
 
           {user ? (
             // User is signed in
-            <UserProfileDropdown user={user} profile={profile} />
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              <UserProfileDropdown user={user} profile={profile} />
+            </div>
           ) : (
             // User is not signed in
             <div className="flex items-center space-x-2">
+              <LanguageSwitcher />
               <button
                 onClick={handleSignIn}
                 className="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 md:inline-flex"
               >
-                Sign In
+                {t('signIn')}
               </button>
               <button
                 onClick={handleSignUp}
                 className="inline-flex items-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                Sign Up
+                {t('signUp')}
               </button>
             </div>
           )}
@@ -183,127 +199,45 @@ export default function UserAuthStatus() {
 
 async function loadProfile(user: User): Promise<UserProfileSummary | null> {
   try {
-    // Get metadata from auth
+    // Get metadata from auth as fallback
     const metadata = user.user_metadata ?? {};
     const fallbackAvatar = (metadata.avatar_url ?? metadata.picture) as string | undefined;
     const fallbackName = (metadata.full_name ?? metadata.name) as string | undefined;
-    const email = user.email ?? '';
 
-    // Try to get user record from public.users
-    let { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .select('role, email')
+    // Try to get user record from the unified 'profiles' table first
+    // This is the source of truth for the profile page
+    let { data: profile, error } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url, role, university')
       .eq('id', user.id)
       .maybeSingle();
 
-    // If user record doesn't exist, create it (use upsert to handle existing records)
-    if (!userRecord && !userError) {
-      console.log('Creating/updating user record for', user.id);
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: email,
-          role: 'student', // Default role
-          email_verified: !!user.email_confirmed_at,
-        }, { onConflict: 'id' })
-        .select('role, email')
-        .single();
-
-      if (insertError) {
-        console.error('Failed to create user record', insertError);
-        // Return basic profile from auth metadata
-        return {
-          id: user.id,
-          role: 'student',
-          fullName: fallbackName ?? undefined,
-          avatarUrl: fallbackAvatar,
-        };
-      }
-      userRecord = newUser;
+    if (error) {
+      console.warn('Error loading profile:', error);
     }
 
-    if (userError) {
-      console.warn('Error loading user record', userError);
-      // Return basic profile from auth metadata
+    // If we have a profile, return it
+    if (profile) {
       return {
         id: user.id,
-        role: 'student',
-        fullName: fallbackName ?? undefined,
-        avatarUrl: fallbackAvatar,
+        role: (profile.role as UserRole) || 'student',
+        fullName: profile.full_name || fallbackName,
+        avatarUrl: profile.avatar_url || fallbackAvatar,
+        university: profile.university,
       };
     }
 
-    const role = (userRecord?.role as UserRole) ?? 'student';
-
-    if (role === 'owner') {
-      let { data: ownerProfile } = await supabase
-        .from('profiles_owner')
-        .select('full_name')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      // Auto-create owner profile if missing (use upsert)
-      if (!ownerProfile) {
-        const { data: newProfile } = await supabase
-          .from('profiles_owner')
-          .upsert({
-            id: user.id,
-            user_id: user.id,
-            full_name: fallbackName ?? '',
-          }, { onConflict: 'id' })
-          .select('full_name')
-          .single();
-        ownerProfile = newProfile;
-      }
-
-      return {
-        id: user.id,
-        role,
-        fullName: ownerProfile?.full_name ?? fallbackName ?? undefined,
-        avatarUrl: fallbackAvatar,
-      };
-    }
-
-    if (role === 'student') {
-      let { data: studentProfile } = await supabase
-        .from('profiles_student')
-        .select('full_name, university')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      // Auto-create student profile if missing (use upsert)
-      if (!studentProfile) {
-        const { data: newProfile } = await supabase
-          .from('profiles_student')
-          .upsert({
-            id: user.id,
-            user_id: user.id,
-            full_name: fallbackName ?? '',
-          }, { onConflict: 'id' })
-          .select('full_name, university')
-          .single();
-        studentProfile = newProfile;
-      }
-
-      return {
-        id: user.id,
-        role,
-        fullName: studentProfile?.full_name ?? fallbackName ?? undefined,
-        avatarUrl: fallbackAvatar,
-        university: studentProfile?.university ?? undefined,
-      };
-    }
-
+    // Default return if no profile found in 'profiles'
     return {
       id: user.id,
-      role,
-      fullName: fallbackName ?? undefined,
+      role: 'student',
+      fullName: fallbackName,
       avatarUrl: fallbackAvatar,
     };
+
   } catch (error) {
     console.error('Failed to load user profile summary', error);
-    // Return basic profile even on error
+    // Return basic profile from auth metadata
     const metadata = user.user_metadata ?? {};
     return {
       id: user.id,

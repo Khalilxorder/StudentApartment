@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 // Performance Optimization API for Student Apartments
 // Handles caching, metrics, and optimization recommendations
 import { NextRequest, NextResponse } from 'next/server';
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Performance optimization API error:', error);
+    logger.error({ err: error }, 'Performance optimization API error:');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -195,7 +197,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Performance optimization GET error:', error);
+    logger.error({ err: error }, 'Performance optimization GET error:');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

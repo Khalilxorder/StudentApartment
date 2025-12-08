@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 
@@ -13,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors
   if (error) {
-    console.error('❌ Google OAuth error:', error);
+    logger.error({ err: error }, '❌ Google OAuth error:');
     return NextResponse.redirect(
       new URL(`/?error=${encodeURIComponent(error)}`, request.url)
     );
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   // Validate required parameters
   if (!code) {
-    console.error('❌ No authorization code received');
+    logger.error('❌ No authorization code received');
     return NextResponse.redirect(
       new URL('/?error=no_code', request.url)
     );
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
     // Note: The actual token exchange happens in the frontend/middleware
     // This handler just receives the callback and redirects appropriately
     
-    console.log('✅ Google OAuth callback received with code');
+    logger.info('✅ Google OAuth callback received with code');
 
     // Redirect to home page with success
     // The frontend will handle the actual session creation
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
       new URL('/?auth=success', request.url)
     );
   } catch (error) {
-    console.error('❌ OAuth callback error:', error);
+    logger.error({ err: error }, '❌ OAuth callback error:');
     return NextResponse.redirect(
       new URL('/?error=callback_error', request.url)
     );

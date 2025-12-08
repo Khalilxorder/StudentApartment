@@ -1,28 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Heart } from 'lucide-react';
 
 interface SaveApartmentButtonProps {
   apartmentId: string;
+  initialSaved?: boolean;
   onSaved?: () => void;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export function SaveApartmentButton({ apartmentId, onSaved }: SaveApartmentButtonProps) {
+export function SaveApartmentButton({
+  apartmentId,
+  initialSaved = false,
+  onSaved,
+  size = 'md'
+}: SaveApartmentButtonProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(initialSaved);
 
-  const handleSave = async (event: React.MouseEvent) => {
+  // Sync local state with prop when it changes
+  useEffect(() => {
+    setSaved(initialSaved);
+  }, [initialSaved]);
+
+  const checkOnMount = false; // Disabled by default for performance
+
+  // Check if already saved on mount (only if enabled)
+  useEffect(() => {
+    if (!checkOnMount || initialSaved) return;
+
+    const checkSavedState = async () => {
+      try {
+        const csrfToken = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('csrf_token='))
+          ?.split('=')[1];
+
+        const res = await fetch('/api/favorites', {
+          headers: {
+            'X-CSRF-Token': csrfToken || '',
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setSaved(data.apartmentIds?.includes(apartmentId) || false);
+        }
+      } catch (err) {
+        // Silently fail - user might not be logged in
+      }
+    };
+
+    checkSavedState();
+  }, [apartmentId, checkOnMount, initialSaved]);
+
+  const handleToggle = async (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    if (saving || saved) return;
+    if (saving) return;
 
     setSaving(true);
     setError(null);
+
     try {
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_token='))
+        ?.split('=')[1];
+
       const res = await fetch('/api/favorites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: saved ? 'DELETE' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken || '',
+        },
         body: JSON.stringify({ apartmentId }),
       });
 
@@ -33,37 +86,46 @@ export function SaveApartmentButton({ apartmentId, onSaved }: SaveApartmentButto
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to save apartment');
+        throw new Error(data.error || 'Failed to update favorite');
       }
 
-      setSaved(true);
+      setSaved(!saved);
       onSaved?.();
     } catch (err: any) {
-      setError(err.message || 'Failed to save apartment');
+      setError(err.message || 'Failed to update favorite');
     } finally {
       setSaving(false);
     }
   };
 
+  const sizeClasses = {
+    sm: 'w-5 h-5',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+  };
+
+  const buttonSizeClasses = {
+    sm: 'p-1.5',
+    md: 'p-2',
+    lg: 'p-2.5',
+  };
+
   return (
     <button
-      onClick={handleSave}
+      onClick={handleToggle}
       disabled={saving}
-      className={`p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm transition-all group ${saved ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
-      title={saved ? 'Saved' : 'Save apartment'}
+      className={`${buttonSizeClasses[size]} rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm transition-all group ${saved ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+      title={saved ? 'Remove from saved' : 'Save apartment'}
+      aria-label={saved ? 'Remove from saved' : 'Save apartment'}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill={saved ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={`w-6 h-6 transition-transform ${saving ? 'animate-pulse' : 'group-hover:scale-110'}`}
-      >
-        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      </svg>
+      <Heart
+        className={`${sizeClasses[size]} transition-transform ${saving ? 'animate-pulse' : 'group-hover:scale-110'}`}
+        fill={saved ? 'currentColor' : 'none'}
+        strokeWidth={2}
+      />
+      {error && (
+        <span className="sr-only">{error}</span>
+      )}
     </button>
   );
 }

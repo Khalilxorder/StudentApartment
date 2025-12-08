@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
+import { logger } from '@/lib/logger';
 
 function getSupabase() {
   return getSupabaseClient();
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's verifications
     const { data: verifications, error } = await supabase
-      .from('verifications')
+      .from('verification')
       .select(`
         id,
         document_type,
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
       .limit(10);
 
     if (error) {
-      console.error('Verification status error:', error);
+      logger.error({ error, userId: user.id }, 'Verification status query failed');
       return NextResponse.json(
         { success: false, error: 'Failed to get verification status' },
         { status: 500 }
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       verifications: verifications || [],
     });
   } catch (error) {
-    console.error('Verification status error:', error);
+    logger.error({ error }, 'Verification status error');
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

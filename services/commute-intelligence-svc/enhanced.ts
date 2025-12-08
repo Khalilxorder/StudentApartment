@@ -280,7 +280,7 @@ export class CommuteIntelligenceService {
         fromLng: apartment.longitude,
         toLat: university.latitude,
         toLng: university.longitude,
-        mode: mode as any,
+        mode: mode as CommuteQuery['mode'],
       });
     } catch (error) {
       console.error('Error calculating commute:', error);
@@ -405,9 +405,9 @@ export class CommuteIntelligenceService {
     const a =
       Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
       Math.cos(phi1) *
-        Math.cos(phi2) *
-        Math.sin(deltaLng / 2) *
-        Math.sin(deltaLng / 2);
+      Math.cos(phi2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 

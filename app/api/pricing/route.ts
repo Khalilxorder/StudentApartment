@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
+
+// Apartment type for pricing calculations
+interface Apartment {
+  id: string;
+  price_huf: number;
+  district: number;
+  bedrooms: number;
+  bathrooms: number;
+  lat?: number;
+  lng?: number;
+  has_balcony?: boolean;
+  has_parking?: boolean;
+  has_elevator?: boolean;
+  pet_friendly?: boolean;
+  furnished?: boolean;
+}
+
+interface Competitor {
+  price_huf: number;
+  bedrooms: number;
+  bathrooms: number;
+}
 
 interface PricingFactors {
   apartment_id: string;
@@ -37,7 +60,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ recommendations });
     }
   } catch (error) {
-    console.error('Error in pricing API:', error);
+    logger.error({ error }, 'Error in pricing API');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -60,7 +83,7 @@ export async function POST(request: NextRequest) {
       .eq('id', apartment_id);
 
     if (updateError) {
-      console.error('Error updating apartment price:', updateError);
+      logger.error({ updateError, apartmentId: apartment_id }, 'Error updating apartment price');
       return NextResponse.json({ error: 'Failed to update price' }, { status: 500 });
     }
 
@@ -78,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in pricing POST:', error);
+    logger.error({ error }, 'Error in pricing POST');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -121,7 +144,7 @@ async function getPricingRecommendation(apartmentId: string): Promise<PricingRec
       revenue_impact: revenueImpact,
     };
   } catch (error) {
-    console.error('Error getting pricing recommendation:', error);
+    logger.error({ error, apartmentId }, 'Error getting pricing recommendation');
     return null;
   }
 }
@@ -148,12 +171,12 @@ async function getAllPricingRecommendations(): Promise<PricingRecommendation[]> 
 
     return recommendations.sort((a, b) => Math.abs(b.revenue_impact) - Math.abs(a.revenue_impact));
   } catch (error) {
-    console.error('Error getting all pricing recommendations:', error);
+    logger.error({ error }, 'Error getting all pricing recommendations');
     return [];
   }
 }
 
-async function calculatePricingFactors(apartment: any): Promise<PricingFactors> {
+async function calculatePricingFactors(apartment: Apartment): Promise<PricingFactors> {
   // Location score based on district and proximity to universities
   const locationScore = calculateLocationScore(apartment.district, apartment.lat, apartment.lng);
 
@@ -255,7 +278,7 @@ function calculateSeasonalityMultiplier(): number {
   return seasonalMultipliers[month] || 0.9;
 }
 
-async function calculateCompetitorAdjustment(apartment: any): Promise<number> {
+async function calculateCompetitorAdjustment(apartment: Apartment): Promise<number> {
   try {
     // Find similar apartments in the same district
     const { data: competitors } = await supabase
@@ -270,7 +293,7 @@ async function calculateCompetitorAdjustment(apartment: any): Promise<number> {
     }
 
     // Calculate average price of similar apartments
-    const similarCompetitors = competitors.filter((comp: any) =>
+    const similarCompetitors = competitors.filter((comp: Competitor) =>
       Math.abs(comp.bedrooms - apartment.bedrooms) <= 1 &&
       Math.abs(comp.bathrooms - apartment.bathrooms) <= 1
     );
@@ -279,7 +302,7 @@ async function calculateCompetitorAdjustment(apartment: any): Promise<number> {
       return 1.0;
     }
 
-    const avgCompetitorPrice = similarCompetitors.reduce((sum: number, comp: any) => sum + comp.price_huf, 0) / similarCompetitors.length;
+    const avgCompetitorPrice = similarCompetitors.reduce((sum: number, comp: Competitor) => sum + comp.price_huf, 0) / similarCompetitors.length;
 
     // Return adjustment factor (1.0 = same as competitors, >1 = higher, <1 = lower)
     return apartment.price_huf / avgCompetitorPrice;
@@ -288,7 +311,7 @@ async function calculateCompetitorAdjustment(apartment: any): Promise<number> {
   }
 }
 
-function calculateAmenitiesScore(apartment: any): number {
+function calculateAmenitiesScore(apartment: Apartment): number {
   let score = 0.5; // Base score
 
   // Add points for amenities (this would be expanded based on your data model)
@@ -301,7 +324,7 @@ function calculateAmenitiesScore(apartment: any): number {
   return Math.min(score, 1.0);
 }
 
-function calculateConditionScore(apartment: any): number {
+function calculateConditionScore(apartment: Apartment): number {
   // This would be based on apartment age, renovation status, etc.
   // For now, return a default score
   return 0.8;

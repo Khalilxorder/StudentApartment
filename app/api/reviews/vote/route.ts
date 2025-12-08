@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabaseClient';
+import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const voteSchema = z.object({
   reviewId: z.string().uuid(),
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
           .eq('id', existingVote.id);
 
         if (deleteError) {
-          console.error('Error removing vote:', deleteError);
+          logger.error({ deleteError, reviewId }, 'Error removing vote');
           return NextResponse.json(
             { error: 'Failed to remove vote' },
             { status: 500 }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
           .eq('id', existingVote.id);
 
         if (updateError) {
-          console.error('Error updating vote:', updateError);
+          logger.error({ updateError, reviewId }, 'Error updating vote');
           return NextResponse.json(
             { error: 'Failed to update vote' },
             { status: 500 }
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error('Error creating vote:', insertError);
+        logger.error({ insertError, reviewId }, 'Error creating vote');
         return NextResponse.json(
           { error: 'Failed to create vote' },
           { status: 500 }
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Review vote error:', error);
+    logger.error({ error }, 'Review vote error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -173,7 +174,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-      console.error('Error fetching vote:', error);
+      logger.error({ error, reviewId }, 'Error fetching vote');
       return NextResponse.json(
         { error: 'Failed to fetch vote' },
         { status: 500 }
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Get vote error:', error);
+    logger.error({ error }, 'Get vote error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

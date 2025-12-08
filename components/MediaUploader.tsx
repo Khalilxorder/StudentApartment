@@ -38,8 +38,17 @@ export function MediaUploader({
       });
       formData.append('apartmentId', apartmentId);
 
+      // Get CSRF token from cookies
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_token='))
+        ?.split('=')[1];
+
       const response = await fetch('/api/media/upload', {
         method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfToken || '',
+        },
         body: formData,
       });
 

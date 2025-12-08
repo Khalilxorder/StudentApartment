@@ -19,6 +19,7 @@ import { batchScoringService } from '@/services/batch-scoring-svc';
 import { getCacheStats } from '@/lib/cache/lru';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       // User context is optional
-      console.debug('[SemanticSearch] Could not get user context for AI scoring');
+      logger.debug('Could not get user context for AI scoring');
     }
 
     const { query, filters, limit = 20, includeAiScore = true } = await request.json();
@@ -109,14 +110,9 @@ export async function POST(request: NextRequest) {
         });
 
         // Log AI scoring metrics
-        console.log('[SemanticSearch] AI Scoring:', {
-          attempted: results.length,
-          successful: scoringResult.successful,
-          failed: scoringResult.failed,
-          totalMs: scoringResult.totalTime,
-        });
+        logger.info({ attempted: results.length, successful: scoringResult.successful, failed: scoringResult.failed, totalMs: scoringResult.totalTime }, 'AI Scoring metrics');
       } catch (error: any) {
-        console.warn('[SemanticSearch] AI scoring failed:', error.message);
+        logger.warn({ error: error.message }, 'AI scoring failed');
         // Continue with results without AI scores
         aiScoringMs = Date.now() - aiScoringStart;
       }
@@ -135,7 +131,7 @@ export async function POST(request: NextRequest) {
       powered_by: 'gemini_768d' as const,
     };
 
-    console.log('[SemanticSearch] Metrics:', JSON.stringify(metrics));
+    logger.info(metrics, 'SemanticSearch Metrics');
 
     return NextResponse.json({
       success: true,
@@ -156,18 +152,14 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    const errorCode = error?.message?.includes('[Vector Dimension Mismatch]') 
-      ? 'VECTOR_DIM_MISMATCH' 
-      : error?.code === 'ECONNREFUSED' 
-      ? 'EMBEDDING_SERVICE_UNAVAILABLE'
-      : 'EMBEDDING_ERROR';
+    const errorCode = error?.message?.includes('[Vector Dimension Mismatch]')
+      ? 'VECTOR_DIM_MISMATCH'
+      : error?.code === 'ECONNREFUSED'
+        ? 'EMBEDDING_SERVICE_UNAVAILABLE'
+        : 'EMBEDDING_ERROR';
 
-    console.error('[SemanticSearch] Error:', {
-      code: errorCode,
-      message: error?.message,
-      totalMs: Date.now() - startTime,
-    });
-    
+    logger.error({ code: errorCode, message: error?.message, totalMs: Date.now() - startTime }, 'SemanticSearch Error');
+
     return NextResponse.json(
       {
         error: 'Semantic search failed',

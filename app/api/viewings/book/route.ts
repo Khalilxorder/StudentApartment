@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabaseClient';
 import { rateLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+import { ApiErrors, successResponse } from '@/lib/api-response';
 
 interface ViewingBookingRequest {
   slotId: string;
@@ -42,67 +44,45 @@ export async function POST(request: NextRequest) {
     const { slotId, notes } = body;
 
     if (!slotId) {
-      return NextResponse.json(
-        { error: 'slotId is required' },
-        { status: 400 }
-      );
+      return ApiErrors.badRequest('slotId is required');
     }
 
-    // Get slot details and check availability
-    const { data: slot, error: slotError } = await supabase
-      .from('viewing_slots')
-      .select('*, apartments(title)')
-      .eq('id', slotId)
-      .single();
-
-    if (slotError || !slot) {
-      return NextResponse.json(
-        { error: 'Viewing slot not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if slot is available
-    const { data: isAvailable } = await supabase.rpc('is_viewing_slot_available', {
-      slot_id: slotId,
+    // Use atomic RPC for race-condition-free booking
+    const { data: bookingResult, error: rpcError } = await supabase.rpc('book_viewing_slot', {
+      p_slot_id: slotId,
+      p_student_id: user.id,
+      p_notes: notes || null,
     });
 
-    if (!isAvailable) {
-      return NextResponse.json(
-        { error: 'Viewing slot is not available' },
-        { status: 409 }
-      );
+    if (rpcError) {
+      logger.error({ rpcError, slotId, userId: user.id }, 'Booking RPC failed');
+      return ApiErrors.internalError('Failed to book viewing slot');
     }
 
-    // Check if user already has a booking for this slot
-    const { data: existingBooking } = await supabase
-      .from('viewing_bookings')
-      .select('id')
-      .eq('viewing_slot_id', slotId)
-      .eq('student_id', user.id)
+    // Handle RPC response
+    if (!bookingResult.success) {
+      // Map RPC errors to appropriate HTTP responses
+      const errorMsg = bookingResult.error as string;
+      if (errorMsg.includes('not found')) {
+        return ApiErrors.notFound('Viewing slot');
+      }
+      if (errorMsg.includes('not available')) {
+        return ApiErrors.conflict('Viewing slot is no longer available');
+      }
+      if (errorMsg.includes('already have a booking')) {
+        return ApiErrors.conflict('You already have a booking for this slot');
+      }
+      return ApiErrors.badRequest(errorMsg);
+    }
+
+    const booking = bookingResult.booking;
+
+    // Get slot details for notifications (still needed for email/calendar)
+    const { data: slot } = await supabase
+      .from('viewing_slots')
+      .select('*, apartments(title, address)')
+      .eq('id', slotId)
       .single();
-
-    if (existingBooking) {
-      return NextResponse.json(
-        { error: 'You already have a booking for this slot' },
-        { status: 409 }
-      );
-    }
-
-    // Create booking
-    const { data: booking, error: bookingError } = await supabase
-      .from('viewing_bookings')
-      .insert({
-        viewing_slot_id: slotId,
-        student_id: user.id,
-        notes,
-      })
-      .select()
-      .single();
-
-    if (bookingError) {
-      return NextResponse.json({ error: bookingError.message }, { status: 400 });
-    }
 
     // Send notification to owner
     await supabase.from('notifications').insert({
@@ -125,7 +105,7 @@ export async function POST(request: NextRequest) {
           { email: user.email, name: user.user_metadata?.full_name },
         ],
       };
-      
+
       try {
         // Create calendar event (Google Calendar or iCal export)
         await fetch('/api/calendar/events', {
@@ -137,9 +117,9 @@ export async function POST(request: NextRequest) {
             ownerId: slot.owner_id,
             bookingId: booking.id,
           }),
-        }).catch(err => console.error('[viewing] Calendar integration error:', err));
+        }).catch(err => logger.error({ err, userId: user.id }, '[viewing] Calendar integration error'));
       } catch (err) {
-        console.error('[viewing] Failed to add calendar event:', err);
+        logger.error({ err, userId: user.id }, '[viewing] Failed to add calendar event');
         // Don't fail the booking if calendar integration fails
       }
       // Don't fail the booking if calendar integration fails
@@ -166,9 +146,9 @@ export async function POST(request: NextRequest) {
           type: 'viewing_confirmation',
           data: emailData,
         }),
-      }).catch(err => console.error('[viewing] Email sending error:', err));
+      }).catch(err => logger.error({ err, userId: user.id }, '[viewing] Email sending error'));
     } catch (err) {
-      console.error('[viewing] Failed to send confirmation email:', err);
+      logger.error({ err, userId: user.id }, '[viewing] Failed to send confirmation email');
       // Don't fail the booking if email fails
     }
 
@@ -181,7 +161,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error booking viewing:', error);
+    logger.error({ error }, 'Error booking viewing');
     return NextResponse.json(
       { error: 'Failed to book viewing' },
       { status: 500 }

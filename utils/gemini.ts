@@ -1,5 +1,10 @@
 // Using REST API directly to avoid SDK compatibility issues
-const API_KEY = process.env.GOOGLE_AI_API_KEY || '';
+// Try primary key first, fall back to secondary key if available
+function getApiKey(): string {
+  return process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
+}
+
+// Lazy-load API key to ensure env vars are loaded
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Simple in-memory cache for AI scoring results
@@ -20,12 +25,12 @@ function hashUserProfile(userProfile: any): string {
   return Buffer.from(key).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
 }
 
-// Models available - Using gemini-2.5-flash-lite (Gemini Flash 2.5 Lite)
+// Models available - Using Gemini 2.0 Flash (stable)
 export const MODELS = {
-  TEXT: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
-  FLASH: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
-  FLASH_PREVIEW: 'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite
-  PRO: 'gemini-2.5-flash-lite' // Gemini Flash 2.5 Lite
+  TEXT: 'gemini-2.0-flash', // Gemini 2.0 Flash (stable)
+  FLASH: 'gemini-2.0-flash', // Gemini 2.0 Flash (stable)
+  FLASH_PREVIEW: 'gemini-2.5-flash', // Gemini 2.5 Flash (preview)
+  PRO: 'gemini-2.5-pro' // Gemini 2.5 Pro
 } as const;
 
 // Generate response from text prompt using REST API with parallel failover
@@ -41,17 +46,19 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     return pendingRequests.get(requestHash)!;
   }
   
-  // Try different models in order of preference (using Gemini Flash with fallbacks)
+  // Try different models in order of preference (using available Gemini models)
   const modelsToTry = [
-    'gemini-1.5-flash', // Standard Flash 1.5 - better quota limits
-    'gemini-2.5-flash-lite', // Gemini Flash 2.5 Lite (fallback)
+    'gemini-2.0-flash', // Standard Flash 2.0 - stable and fast
+    'gemini-2.5-flash', // Gemini Flash 2.5 (fallback)
+    'gemini-2.0-flash-lite', // Lite version (fallback)
   ];
 
   const makeRequest = async (): Promise<string> => {
+    const apiKey = getApiKey();
     // Try all models in parallel for fastest response (race condition)
     const parallelAttempts = modelsToTry.slice(0, 2).map(async (modelName) => {
       try {
-        const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
+        const url = `${API_URL}/${modelName}:generateContent?key=${apiKey}`;
         
         console.log(`🤖 Server: Analyzing story with ${modelName}...`);
         const response = await fetch(url, {
@@ -74,6 +81,12 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
 
         if (!response.ok) {
           const errorText = await response.text();
+          // Check for quota/rate limit errors
+          if (response.status === 429) {
+            console.log(`⚠️ Quota exceeded for ${modelName}, trying next model...`);
+          } else if (response.status === 403) {
+            console.log(`⚠️ API not enabled or permission denied for ${modelName}`);
+          }
           throw new Error(`${modelName}: ${response.status} - ${errorText.substring(0, 200)}`);
         }
 
@@ -101,7 +114,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
       // Sequential fallback with remaining models
       for (const modelName of modelsToTry.slice(2)) {
         try {
-          const url = `${API_URL}/${modelName}:generateContent?key=${API_KEY}`;
+          const url = `${API_URL}/${modelName}:generateContent?key=${apiKey}`;
           
           const response = await fetch(url, {
             method: 'POST',

@@ -31,7 +31,7 @@ export function getPool(): Pool {
 export async function runQuery<T = any>(text: string, params: any[] = []) {
   const pool = getPool();
   try {
-    return await pool.query(text, params) as any;
+    return await pool.query(text, params) as unknown as { rows: T[]; rowCount: number };
   } catch (error) {
     console.error('Database query failed:', error);
     // Return mock data for development

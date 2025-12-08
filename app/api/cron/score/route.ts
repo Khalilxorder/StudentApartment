@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runQuery } from '@/lib/db/pool';
 import { batchScoringService } from '@/services/batch-scoring-svc';
+import { logger } from '@/lib/logger';
 
 // This should be set in environment variables and kept secret
 const CRON_SECRET = process.env.CRON_SECRET || 'default-secret';
@@ -52,9 +53,10 @@ export async function POST(request: NextRequest) {
     // Validate cron secret
     const authHeader = request.headers.get('Authorization') || '';
     const providedSecret = authHeader.replace('Bearer ', '');
+    const source = request.headers.get('x-cron-source') || 'unknown';
 
     if (providedSecret !== CRON_SECRET) {
-      console.warn('[ScoringCron] Unauthorized access attempt');
+      logger.warn({ source }, '[ScoringCron] Unauthorized access attempt');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 },
@@ -62,8 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify request is from authorized source
-    const source = request.headers.get('x-cron-source') || 'unknown';
-    console.log('[ScoringCron] Starting background scoring job from', source);
+    logger.info({ source }, '[ScoringCron] Starting background scoring job');
 
     // Find recently active users (viewed apartments in last 24h)
     const activeUsersResult = await runQuery<{
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (!activeUsersResult.rows || activeUsersResult.rows.length === 0) {
-      console.log('[ScoringCron] No active users found');
+      logger.info('[ScoringCron] No active users found');
       return NextResponse.json({
         success: true,
         message: 'No active users found',
@@ -87,8 +88,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-  const activeUserIds = activeUsersResult.rows.map(({ user_id }: { user_id: string }) => user_id);
-    console.log('[ScoringCron] Found', activeUserIds.length, 'active users');
+    const activeUserIds = activeUsersResult.rows.map(({ user_id }: { user_id: string }) => user_id);
+    logger.info({ count: activeUserIds.length }, '[ScoringCron] Found active users');
 
     // Process each user
     let totalScored = 0;
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
         const userProfile = profileResult.rows?.[0] || {};
         const apartments = apartmentsResult.rows;
 
-        console.log('[ScoringCron] Scoring', apartments.length, 'apartments for user', userId);
+        logger.info({ userId, count: apartments.length }, '[ScoringCron] Scoring apartments for user');
 
         // Score batch
         const result = await batchScoringService.scoreApartmentBatch(
@@ -163,26 +164,16 @@ export async function POST(request: NextRequest) {
         totalScored += result.successful;
         totalFailed += result.failed;
 
-        console.log('[ScoringCron] User batch result:', {
-          userId,
-          successful: result.successful,
-          failed: result.failed,
-          timeMs: result.totalTime,
-        });
+        logger.info({ userId, result: { successful: result.successful, failed: result.failed, timeMs: result.totalTime } }, '[ScoringCron] User batch result');
       } catch (error: any) {
-        console.error('[ScoringCron] Error processing user', userId, error.message);
+        logger.error({ userId, err: error.message }, '[ScoringCron] Error processing user');
         totalFailed += 1;
       }
     }
 
     const totalTime = Date.now() - startTime;
 
-    console.log('[ScoringCron] Job complete:', {
-      totalScored,
-      totalFailed,
-      duration: totalTime,
-      usersProcessed: activeUserIds.length,
-    });
+    logger.info({ totalScored, totalFailed, duration: totalTime, usersProcessed: activeUserIds.length }, '[ScoringCron] Job complete');
 
     return NextResponse.json({
       success: true,
@@ -195,7 +186,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[ScoringCron] Job failed:', error.message);
+    logger.error({ err: error.message, duration: Date.now() - startTime }, '[ScoringCron] Job failed');
 
     return NextResponse.json(
       {

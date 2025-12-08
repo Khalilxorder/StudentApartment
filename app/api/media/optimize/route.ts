@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error('Error fetching optimization jobs:', error);
+    logger.error({ err: error }, 'Error fetching optimization jobs:');
     return NextResponse.json(
       { error: 'Failed to fetch optimization jobs' },
       { status: 500 }
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error queuing optimization jobs:', error);
+    logger.error({ err: error }, 'Error queuing optimization jobs:');
     return NextResponse.json(
       { error: 'Failed to queue optimization jobs' },
       { status: 500 }

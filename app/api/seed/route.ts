@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
         const { data, error } = await supabase.from('apartments').insert(apartments).select();
 
         if (error) {
-            console.error('Seed error:', error);
+            logger.error({ err: error }, 'Seed error:');
             return NextResponse.json({ error: error.message, details: error }, { status: 500 });
         }
 
@@ -109,7 +111,7 @@ export async function POST(req: NextRequest) {
             apartments: data
         });
     } catch (error: any) {
-        console.error('Seed endpoint error:', error);
+        logger.error({ err: error }, 'Seed endpoint error:');
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

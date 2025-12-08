@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '@/lib/logger';
 
 // POST /api/reviews/upload-photo - Upload a photo for a review
 export async function POST(request: NextRequest) {
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData() as any;
-    const file = formData.get('file') as File;
-    const caption = formData.get('caption') as string || '';
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const caption = (formData.get('caption') as string) || '';
 
     if (!file) {
       return NextResponse.json(
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Error uploading file:', uploadError);
+      logger.error({ uploadError, userId: user.id }, 'Error uploading review photo');
       return NextResponse.json(
         { error: 'Failed to upload file' },
         { status: 500 }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Photo upload error:', error);
+    logger.error({ error }, 'Photo upload error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

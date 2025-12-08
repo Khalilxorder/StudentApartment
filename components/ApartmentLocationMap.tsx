@@ -5,6 +5,7 @@ import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 
 import { getMapsConfig } from '@/lib/maps/config';
 import { MapsApiKeyNotice } from '@/components/maps/MapsApiKeyNotice';
+import MapEmbed from '@/components/MapEmbed';
 
 interface ApartmentLocationMapProps {
   latitude: number;
@@ -37,7 +38,19 @@ export default function ApartmentLocationMap({
   });
 
   if (shouldShowFallback || loadError) {
-    return <MapsApiKeyNotice message={mapsConfig.fallbackMessage} />;
+    return (
+      <div className="space-y-3">
+        <MapsApiKeyNotice
+          message={
+            loadError
+              ? `Maps failed to load. ${loadError.message || mapsConfig.fallbackMessage}`
+              : mapsConfig.fallbackMessage
+          }
+        />
+        {/* Fallback to a lightweight embed so users still see the location */}
+        <MapEmbed lat={latitude} lng={longitude} />
+      </div>
+    );
   }
 
   if (!isLoaded) {

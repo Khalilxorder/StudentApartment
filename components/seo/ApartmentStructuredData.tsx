@@ -1,4 +1,4 @@
-import { Apartment } from '../../types/apartment';
+import type { Apartment } from '@/types/apartment';
 
 interface ApartmentStructuredDataProps {
   apartment: Apartment;
@@ -29,7 +29,7 @@ export function ApartmentStructuredData({ apartment }: ApartmentStructuredDataPr
       value: apartment.size_sqm,
       unitText: 'SquareMeter',
     },
-    amenityFeature: apartment.amenities?.map(amenity => ({
+    amenityFeature: apartment.amenities?.map((amenity: string) => ({
       '@type': 'LocationFeatureSpecification',
       name: amenity,
     })),

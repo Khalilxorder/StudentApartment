@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getFriendlyOAuthError } from '@/lib/auth-errors';
+import { logger } from '@/lib/logger';
+import { AuthError } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors
   if (error) {
-    console.error('OAuth error:', error, error_description);
+    logger.error({ error, error_description }, 'OAuth error');
     const redirectUrl = new URL('/login', requestUrl.origin);
     const friendlyError = getFriendlyOAuthError(
       error_description || error,
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Supabase environment variables are not configured for OAuth callback');
+      logger.error('Supabase environment variables are not configured for OAuth callback');
       const redirectUrl = new URL('/login', requestUrl.origin);
       redirectUrl.searchParams.set(
         'error',
@@ -61,13 +63,13 @@ export async function GET(request: NextRequest) {
     );
 
     // Log the code for debugging
-    console.log('Received OAuth code:', code.substring(0, 20) + '...');
+    logger.info({ codeSnippet: code.substring(0, 20) + '...' }, 'Received OAuth code');
 
     let sessionData:
       | Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>['data']
       | null = null;
     let exchangeError:
-      | Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>['error']
+      | AuthError
       | Error
       | null = null;
 
@@ -80,14 +82,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (exchangeError) {
-      console.error('Session exchange error:', exchangeError);
-      if (exchangeError && typeof (exchangeError as any)?.message === 'string') {
-        console.error('Error details:', {
-          message: (exchangeError as any).message,
-          status: (exchangeError as any).status,
-          code: (exchangeError as any).code,
-        });
-      }
+      logger.error({
+        exchangeError,
+        message: exchangeError.message,
+        name: exchangeError.name
+      }, 'Session exchange error');
 
       const redirectUrl = new URL('/login', requestUrl.origin);
       redirectUrl.searchParams.set(
@@ -97,7 +96,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    console.log('Session exchange successful:', !!sessionData?.session);
+    logger.info({ success: !!sessionData?.session }, 'Session exchange successful');
 
     // Check if user profile exists, create if not
     if (sessionData?.user) {
@@ -113,7 +112,7 @@ export async function GET(request: NextRequest) {
           sessionData.user.user_metadata?.full_name ||
           sessionData.user.user_metadata?.name ||
           '';
-        
+
         await supabase.from('profiles').insert({
           id: sessionData.user.id,
           email: sessionData.user.email,
@@ -127,13 +126,12 @@ export async function GET(request: NextRequest) {
           preferences: {}
         });
 
-        console.log('Created new profile for user:', sessionData.user.id);
+        logger.info({ userId: sessionData.user.id }, 'Created new profile for user');
       }
 
       // Check if user has completed onboarding (stored in preferences)
       const hasCompletedOnboarding = profile?.preferences?.onboarding_completed === true;
 
-      // Redirect based on onboarding status
       if (hasCompletedOnboarding) {
         // User has completed onboarding, redirect to dashboard
         const redirectUrl = new URL('/dashboard', requestUrl.origin);

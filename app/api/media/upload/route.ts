@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 interface MediaConfig {
   maxWidth: number;
@@ -77,7 +78,9 @@ class MediaService {
 
   async processUserAvatar(buffer: Buffer, userId: string): Promise<ProcessedMedia> {
     const hash = this.generateHash(buffer);
-    const basePath = `users/${userId}/${hash}`;
+    // Use avatars subfolder in apartments bucket (more reliable than separate bucket)
+    const avatarPath = `avatars/${userId}/${hash}_avatar.webp`;
+    const thumbPath = `avatars/${userId}/${hash}_thumb.webp`;
 
     // Square crop for avatar
     const cropped = await sharp(buffer)
@@ -85,8 +88,13 @@ class MediaService {
       .webp({ quality: 90 })
       .toBuffer();
 
-    const original = await this.saveBuffer(cropped, `${basePath}/avatar.webp`);
-    const thumbnail = await this.createThumbnail(cropped, `${basePath}/thumb.webp`);
+    // Save to apartments bucket (which is guaranteed to exist)
+    const original = await this.saveBufferToBucket(cropped, avatarPath, 'apartments');
+    const thumbnail = await this.saveBufferToBucket(
+      await sharp(cropped).resize(100, 100, { fit: 'cover' }).webp({ quality: 80 }).toBuffer(),
+      thumbPath,
+      'apartments'
+    );
 
     const blurhash = await this.generateBlurhash(cropped);
     const metadata = await this.extractMetadata(cropped);
@@ -203,8 +211,8 @@ class MediaService {
       const blurhash = encode(new Uint8ClampedArray(data), info.width, info.height, 4, 3);
 
       return blurhash;
-    } catch (error) {
-      console.error('Error generating blurhash:', error);
+    } catch (error: unknown) {
+      logger.error({ err: error }, 'Error generating blurhash:');
       // Return a fallback blurhash for a neutral gray image
       return 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
     }
@@ -230,25 +238,40 @@ class MediaService {
   }
 
   private async saveBuffer(buffer: Buffer, path: string): Promise<string> {
-    // Upload to Supabase Storage
+    return this.saveBufferToBucket(buffer, path, 'apartments');
+  }
+
+  private async saveBufferToBucket(buffer: Buffer, path: string, bucket: string): Promise<string> {
+    // Check for required environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL is not configured');
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured - required for storage uploads');
+    }
+
+    // Upload to Supabase Storage using service role client
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
+    logger.info(`Uploading to bucket: ${bucket}, path: ${path}`);
+
     const { error } = await supabase.storage
-      .from('apartments')
+      .from(bucket)
       .upload(path, buffer, {
         contentType: 'image/webp',
         upsert: true,
       });
 
     if (error) {
+      logger.error({ err: error, bucket, path }, 'Storage upload failed');
       throw new Error(`Storage upload failed: ${error.message}`);
     }
 
     const { data } = supabase.storage
-      .from('apartments')
+      .from(bucket)
       .getPublicUrl(path);
 
     return data.publicUrl;
@@ -327,13 +350,13 @@ class MediaService {
         .eq('apartment_id', apartmentId);
 
       if (error) {
-        console.error('Error counting apartment photos:', error);
+        logger.error({ err: error }, 'Error counting apartment photos:');
         return 0;
       }
 
       return count || 0;
-    } catch (error) {
-      console.error('Failed to get apartment photo count:', error);
+    } catch (error: unknown) {
+      logger.error({ err: error }, 'Failed to get apartment photo count');
       return 0;
     }
   }
@@ -343,20 +366,26 @@ const mediaService = new MediaService();
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const formData = await request.formData();
-    const file = (formData as any).get('file') as File | null;
-    const type = (formData as any).get('type') as string | null;
-    const userId = (formData as any).get('userId') as string | null;
-    const apartmentId = (formData as any).get('apartmentId') as string | null;
+    const file = formData.get('file') as File | null;
+    const type = formData.get('type') as string | null;
+    const userId = formData.get('userId') as string | null;
+    const apartmentId = formData.get('apartmentId') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    // Global file size validation (10MB hard limit for all uploads)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'File too large. Maximum size is 10MB' }, { status: 400 });
     }
 
     if (!type) {
@@ -365,14 +394,25 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Analyze image first
-    const analysis = await mediaService.analyzeImage(buffer);
+    // Only analyze images, skip for documents unless we want to validate PDF header
+    let analysis: MediaAnalysis = {
+      isValid: true,
+      quality: 1,
+      brightness: 0.5,
+      contrast: 0.5,
+      sharpness: 0.5,
+      tags: [],
+      warnings: []
+    };
 
-    if (!analysis.isValid) {
-      return NextResponse.json({
-        error: 'Invalid image',
-        warnings: analysis.warnings
-      }, { status: 400 });
+    if (type !== 'document') {
+      analysis = await mediaService.analyzeImage(buffer);
+      if (!analysis.isValid) {
+        return NextResponse.json({
+          error: 'Invalid image',
+          warnings: analysis.warnings
+        }, { status: 400 });
+      }
     }
 
     let result: any;
@@ -390,14 +430,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Validate file size (max 10MB)
-        const maxSizeBytes = 10 * 1024 * 1024; // 10MB
-        if (buffer.length > maxSizeBytes) {
-          return NextResponse.json({
-            error: 'File too large. Maximum size is 10MB'
-          }, { status: 400 });
-        }
-
+        // Processing logic...
         // Allow uploads without apartmentId for new listings
         result = await mediaService.processApartmentImage(buffer, file.name);
         break;
@@ -413,10 +446,19 @@ export async function POST(request: NextRequest) {
         if (!userId) {
           return NextResponse.json({ error: 'userId required for documents' }, { status: 400 });
         }
-        const docType = (formData as any).get('docType') as string;
+
+        // Validate PDF type
+        const docType = formData.get('docType') as string;
         if (!docType) {
           return NextResponse.json({ error: 'docType required for documents' }, { status: 400 });
         }
+
+        // Validating PDF magic bytes (starts with %PDF)
+        const isPdf = buffer.lastIndexOf('%PDF-') === 0 || (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46);
+        if (!isPdf && file.type !== 'application/pdf') {
+          return NextResponse.json({ error: 'Invalid document format. Only PDF allowed.' }, { status: 400 });
+        }
+
         result = await mediaService.processDocument(buffer, userId, docType);
         break;
 
@@ -426,15 +468,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      url: result.optimized, // Return the optimized image URL for the form
+      url: result.optimized || result, // Handle document string return
       data: {
         ...result,
         analysis,
       },
     });
 
-  } catch (error) {
-    console.error('Media upload error:', error);
+  } catch (error: unknown) {
+    logger.error({ error, details: error instanceof Error ? error.message : 'Unknown' }, 'Media upload error');
     return NextResponse.json(
       { error: 'Upload failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -445,14 +487,14 @@ export async function POST(request: NextRequest) {
 // Analyze image without uploading
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const formData = await request.formData();
-    const file = (formData as any).get('file') as File | null;
+    const file = formData.get('file') as File | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -466,8 +508,8 @@ export async function PUT(request: NextRequest) {
       analysis,
     });
 
-  } catch (error) {
-    console.error('Media analysis error:', error);
+  } catch (error: unknown) {
+    logger.error({ err: error }, 'Media analysis error:');
     return NextResponse.json(
       { error: 'Analysis failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

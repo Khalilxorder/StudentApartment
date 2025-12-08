@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/utils/supabaseClient';
 import { Resend } from 'resend';
+import { logger } from '@/lib/logger';
 
 // Lazy-load Resend for email notifications
 function getResend() {
@@ -65,20 +66,20 @@ function startQueueProcessor() {
             html: emailJob.html,
           });
           emailQueue.shift(); // Remove from queue
-          console.log(`✓ Email sent to ${emailJob.email}`);
+          logger.info({ email: emailJob.email }, 'Email sent successfully');
         } else {
-          console.warn('Resend not configured, email not sent');
+          logger.warn('Resend not configured, email not sent');
           emailQueue.shift();
         }
       } catch (error) {
-        console.error(`Email send failed for ${emailJob.email}:`, error);
+        logger.error({ error, email: emailJob.email }, 'Email send failed');
 
         if (emailJob.retries < emailJob.maxRetries) {
           emailJob.retries++;
-          console.log(`Retrying... (${emailJob.retries}/${emailJob.maxRetries})`);
+          logger.info({ retries: emailJob.retries, maxRetries: emailJob.maxRetries }, 'Retrying email');
         } else {
           emailQueue.shift(); // Remove after max retries
-          console.error(`Email permanently failed for ${emailJob.email}`);
+          logger.error({ email: emailJob.email }, 'Email permanently failed after max retries');
         }
       }
     }
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('Send alerts error:', error);
+    logger.error({ error }, 'Send alerts error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -159,7 +160,7 @@ async function sendSavedSearchAlerts() {
       .eq('email_alerts_enabled', true);
 
     if (searchError) {
-      console.error('Error fetching saved searches for alerts:', searchError);
+      logger.error({ searchError }, 'Error fetching saved searches for alerts');
       return { success: false, error: searchError.message };
     }
 
@@ -168,17 +169,19 @@ async function sendSavedSearchAlerts() {
     }
 
     // Group searches by user to batch emails
-    const userSearches = savedSearches.reduce((acc: any, search: any) => {
+    const userSearches = savedSearches.reduce<Record<string, { email: string; searches: typeof savedSearches }>>((acc, search) => {
       const userId = search.user_id;
+      // profiles is a single object from the foreign key join (not an array)
+      const profileData = search.profiles as unknown as { email: string } | null;
       if (!acc[userId]) {
         acc[userId] = {
-          email: (search.profiles as any).email,
+          email: profileData?.email || '',
           searches: []
         };
       }
       acc[userId].searches.push(search);
       return acc;
-    }, {} as Record<string, { email: string; searches: any[] }>);
+    }, {});
 
     // Process each user's searches
     for (const [userId, userData] of Object.entries(userSearches)) {
@@ -296,7 +299,7 @@ async function sendSavedSearchAlerts() {
     };
 
   } catch (error) {
-    console.error('Error sending saved search alerts:', error);
+    logger.error({ error }, 'Error sending saved search alerts');
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -307,9 +310,9 @@ async function sendSavedSearchAlerts() {
 // Send alert email using Resend
 async function sendAlertEmail(email: string, alertData: any[]) {
   const resend = getResend();
-  
+
   if (!resend) {
-    console.warn('Resend API key not configured, skipping email send');
+    logger.warn('Resend API key not configured, skipping email send');
     return { success: false, error: 'Email service not configured' };
   }
 
@@ -328,7 +331,7 @@ async function sendAlertEmail(email: string, alertData: any[]) {
     return { success: true, emailId: result.data?.id };
 
   } catch (error) {
-    console.error('Error sending alert email:', error);
+    logger.error({ error, email }, 'Error sending alert email');
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

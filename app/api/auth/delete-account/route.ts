@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabaseClient';
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', user.id);
 
     if (profileError) {
-      console.error('Error deleting profile:', profileError);
+      logger.error({ profileError, userId: user.id }, 'Error deleting profile');
     }
 
     // Delete user's favorites
@@ -32,7 +33,7 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id);
 
     if (favoritesError) {
-      console.error('Error deleting favorites:', favoritesError);
+      logger.error({ favoritesError, userId: user.id }, 'Error deleting favorites');
     }
 
     // Delete user's bookings
@@ -42,7 +43,7 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id);
 
     if (bookingsError) {
-      console.error('Error deleting bookings:', bookingsError);
+      logger.error({ bookingsError, userId: user.id }, 'Error deleting bookings');
     }
 
     // Delete user's messages
@@ -52,7 +53,7 @@ export async function DELETE(request: NextRequest) {
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
     if (messagesError) {
-      console.error('Error deleting messages:', messagesError);
+      logger.error({ messagesError, userId: user.id }, 'Error deleting messages');
     }
 
     // Delete user's search history
@@ -62,14 +63,14 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id);
 
     if (searchError) {
-      console.error('Error deleting search history:', searchError);
+      logger.error({ searchError, userId: user.id }, 'Error deleting search history');
     }
 
     // Finally, delete the user account
     const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
 
     if (deleteError) {
-      console.error('Error deleting user account:', deleteError);
+      logger.error({ deleteError, userId: user.id }, 'Error deleting user account');
       return NextResponse.json(
         { error: 'Failed to delete account' },
         { status: 500 }
@@ -82,7 +83,7 @@ export async function DELETE(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    logger.error({ error }, 'Unexpected error in delete-account');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

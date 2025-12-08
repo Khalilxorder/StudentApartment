@@ -13,7 +13,7 @@ export const EmailSchema = z.string().email('Invalid email address');
 
 export const PasswordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
+  .min(12, 'Password must be at least 12 characters')
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
@@ -95,26 +95,26 @@ export const CreateApartmentSchema = z.object({
   state: z.string().min(2).max(100),
   zipCode: z.string().min(5).max(10),
   country: z.string().min(2).max(100).default('USA'),
-  
+
   price: z.number().min(0).max(100000),
   securityDeposit: z.number().min(0).max(50000).optional(),
-  
+
   bedrooms: z.number().int().min(0).max(20),
   bathrooms: z.number().min(0).max(20),
   squareFeet: z.number().int().min(1).max(100000).optional(),
-  
+
   apartmentType: ApartmentTypeSchema,
   furnished: z.boolean().default(false),
   petsAllowed: z.boolean().default(false),
   smokingAllowed: z.boolean().default(false),
-  
+
   amenities: z.array(z.string()).max(50).default([]),
   utilities: z.array(z.string()).max(20).default([]),
   images: z.array(URLSchema).min(1).max(20),
-  
+
   availableFrom: DateStringSchema,
   leaseDuration: z.enum(['monthly', '3-months', '6-months', 'yearly', 'flexible']),
-  
+
   universityId: UUIDSchema.optional(),
   commuteTime: z.number().int().min(0).max(300).optional(),
 });
@@ -124,29 +124,29 @@ export const UpdateApartmentSchema = CreateApartmentSchema.partial();
 export const SearchApartmentSchema = z.object({
   q: z.string().max(500).optional(),
   type: z.enum(['structured', 'keyword', 'semantic', 'hybrid']).default('hybrid'),
-  
+
   // Location filters
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   radius: z.number().min(0).max(50000).optional(),
-  
+
   // Price filters
   minPrice: z.number().min(0).optional(),
   maxPrice: z.number().min(0).optional(),
-  
+
   // Room filters
   rooms: z.number().int().min(0).max(20).optional(),
   bathrooms: z.number().min(0).max(20).optional(),
-  
+
   // Feature filters
   amenities: z.array(z.string()).optional(),
   furnished: z.boolean().optional(),
   petsAllowed: z.boolean().optional(),
-  
+
   // University filters
   university: UUIDSchema.optional(),
   maxCommute: z.number().int().min(0).max(300).optional(),
-  
+
   // Sorting and pagination
   sortBy: z.enum(['relevance', 'price', 'newest', 'rating', 'distance']).default('relevance'),
   limit: z.number().int().min(1).max(100).default(20),
@@ -190,13 +190,13 @@ export const CreateReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   title: z.string().min(5).max(200),
   content: z.string().min(20).max(2000),
-  
+
   // Detailed ratings
   cleanliness: z.number().int().min(1).max(5).optional(),
   communication: z.number().int().min(1).max(5).optional(),
   location: z.number().int().min(1).max(5).optional(),
   value: z.number().int().min(1).max(5).optional(),
-  
+
   images: z.array(URLSchema).max(10).optional(),
   stayedFrom: DateStringSchema.optional(),
   stayedTo: DateStringSchema.optional(),
@@ -326,7 +326,7 @@ export function validateSafe<T>(schema: z.ZodSchema<T>, data: unknown) {
  */
 export function getValidationErrors(error: z.ZodError): Record<string, string[]> {
   const errors: Record<string, string[]> = {};
-  
+
   error.issues.forEach((err: z.ZodIssue) => {
     const path = err.path.join('.');
     if (!errors[path]) {
@@ -334,7 +334,7 @@ export function getValidationErrors(error: z.ZodError): Record<string, string[]>
     }
     errors[path].push(err.message);
   });
-  
+
   return errors;
 }
 
@@ -346,11 +346,11 @@ export async function validateRequest<T>(
   data: unknown
 ): Promise<{ success: true; data: T } | { success: false; errors: Record<string, string[]> }> {
   const result = schema.safeParse(data);
-  
+
   if (result.success) {
     return { success: true, data: result.data };
   }
-  
+
   return {
     success: false,
     errors: getValidationErrors(result.error),
@@ -368,46 +368,46 @@ export const ValidationSchemas = {
   DateString: DateStringSchema,
   Pagination: PaginationSchema,
   Coordinates: CoordinatesSchema,
-  
+
   // User
   UserType: UserTypeSchema,
   CreateUser: CreateUserSchema,
   UpdateUserProfile: UpdateUserProfileSchema,
   UserLogin: UserLoginSchema,
-  
+
   // Apartment
   ApartmentStatus: ApartmentStatusSchema,
   ApartmentType: ApartmentTypeSchema,
   CreateApartment: CreateApartmentSchema,
   UpdateApartment: UpdateApartmentSchema,
   SearchApartment: SearchApartmentSchema,
-  
+
   // Booking
   BookingStatus: BookingStatusSchema,
   CreateBooking: CreateBookingSchema,
   UpdateBookingStatus: UpdateBookingStatusSchema,
-  
+
   // Review
   CreateReview: CreateReviewSchema,
   UpdateReview: UpdateReviewSchema,
-  
+
   // Message
   CreateMessage: CreateMessageSchema,
   CreateConversation: CreateConversationSchema,
-  
+
   // Payment
   CreatePaymentIntent: CreatePaymentIntentSchema,
   ConfirmPayment: ConfirmPaymentSchema,
-  
+
   // Verification
   SubmitVerification: SubmitVerificationSchema,
   UpdateVerificationStatus: UpdateVerificationStatusSchema,
-  
+
   // Notification
   NotificationType: NotificationTypeSchema,
   CreateNotification: CreateNotificationSchema,
   UpdateNotification: UpdateNotificationSchema,
-  
+
   // Admin
   AdminAction: AdminActionSchema,
   AdminReport: AdminReportSchema,

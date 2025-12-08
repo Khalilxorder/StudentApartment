@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveDraft } from '@/app/(admin)/admin/actions';
+import { saveDraft } from '@/app/[locale]/(admin)/admin/actions';
 import { SaveIcon, AlertCircle } from 'lucide-react';
 
 interface QuickDraftFormProps {
@@ -34,8 +34,17 @@ export function QuickDraftForm({ initialId, onDraftSaved }: QuickDraftFormProps)
         const formData = new FormData();
         formData.append('file', file);
 
+        // Get CSRF token from cookies
+        const csrfToken = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('csrf_token='))
+          ?.split('=')[1];
+
         const response = await fetch('/api/media/upload', {
           method: 'POST',
+          headers: {
+            'X-CSRF-Token': csrfToken || '',
+          },
           body: formData,
         });
 

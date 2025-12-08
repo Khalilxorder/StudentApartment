@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
 import { runQuery } from '@/lib/db/pool';
+import { logger } from '@/lib/logger';
 
 const feedbackSchema = z.object({
   apartmentId: z.string().uuid(),
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('[SearchFeedbackAPI] Missing Supabase environment variables');
+      logger.error('Missing Supabase environment variables');
       return NextResponse.json(
         { error: 'Server configuration incomplete' },
         { status: 500 },
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
           } catch (error) {
-            console.warn('[SearchFeedbackAPI] Unable to persist auth cookies', error);
+            logger.warn({ error }, 'Unable to persist auth cookies');
           }
         },
       },
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
       durationMs: Date.now() - requestStartedAt,
     });
   } catch (error: any) {
-    console.error('[SearchFeedbackAPI] Failed to record feedback', error?.message || error);
+    logger.error({ error: error?.message || error }, 'Failed to record feedback');
     return NextResponse.json(
       {
         error: 'Failed to record feedback',

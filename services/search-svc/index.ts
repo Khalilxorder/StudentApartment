@@ -702,7 +702,7 @@ function extractCommuteMinutes(commuteCache: unknown, targetUniversity?: string)
     const uniEntry = data[university];
     if (!uniEntry || typeof uniEntry !== 'object') continue;
 
-    for (const modeEntry of Object.values(uniEntry) as any[]) {
+    for (const modeEntry of Object.values(uniEntry) as Array<{ minutes?: number; travelMinutes?: number; travel_minutes?: number } | null>) {
       if (!modeEntry || typeof modeEntry !== 'object') continue;
       const rawMinutes =
         modeEntry.minutes ??

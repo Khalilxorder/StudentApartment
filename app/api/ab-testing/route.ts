@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 // A/B Testing API for Student Apartments
 // Handles experiment management and user assignment
 import { NextRequest, NextResponse } from 'next/server';
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('A/B testing API error:', error);
+    logger.error({ err: error }, 'A/B testing API error:');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -179,7 +181,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('A/B testing GET error:', error);
+    logger.error({ err: error }, 'A/B testing GET error:');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

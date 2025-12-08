@@ -1,3 +1,5 @@
+import { logger } from '@/lib/dev-logger';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error('Error fetching digest sends:', error);
+    logger.error({ err: error }, 'Error fetching digest sends:');
     return NextResponse.json(
       { error: 'Failed to fetch digest sends' },
       { status: 500 }
@@ -144,7 +146,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error sending digest:', error);
+    logger.error({ err: error }, 'Error sending digest:');
     return NextResponse.json(
       { error: 'Failed to send digest' },
       { status: 500 }

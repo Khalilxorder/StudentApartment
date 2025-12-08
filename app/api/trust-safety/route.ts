@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabaseClient';
+import { logger } from '@/lib/logger';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+// Type for content moderation
+interface ContentToModerate {
+  type?: string;
+  text?: string;
+}
+
+// Type for moderation result
+interface ModerationResult {
+  flagged: boolean;
+  reason: string | null;
+  confidence: number;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Trust/Safety API error:', error);
+    logger.error({ error }, 'Trust/Safety API error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -63,12 +78,12 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Trust/Safety GET API error:', error);
+    logger.error({ error }, 'Trust/Safety GET API error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-async function handleUserReport(supabase: any, reporterId: string, targetUserId: string, reason: string) {
+async function handleUserReport(supabase: SupabaseClient, reporterId: string, targetUserId: string, reason: string) {
   if (!targetUserId || !reason) {
     return NextResponse.json({ error: 'Target user ID and reason are required' }, { status: 400 });
   }
@@ -85,7 +100,7 @@ async function handleUserReport(supabase: any, reporterId: string, targetUserId:
     });
 
   if (error) {
-    console.error('Report insertion error:', error);
+    logger.error({ error, targetUserId, reporterId }, 'Report insertion error');
     return NextResponse.json({ error: 'Failed to submit report' }, { status: 500 });
   }
 
@@ -95,7 +110,7 @@ async function handleUserReport(supabase: any, reporterId: string, targetUserId:
   return NextResponse.json({ success: true, message: 'Report submitted successfully' });
 }
 
-async function handleContentModeration(supabase: any, userId: string, content: any) {
+async function handleContentModeration(supabase: SupabaseClient, userId: string, content: ContentToModerate) {
   if (!content) {
     return NextResponse.json({ error: 'Content is required' }, { status: 400 });
   }
@@ -125,7 +140,7 @@ async function handleContentModeration(supabase: any, userId: string, content: a
   return NextResponse.json({ flagged: false, message: 'Content approved' });
 }
 
-async function handleSuspiciousActivity(supabase: any, reporterId: string, targetUserId: string, reason: string) {
+async function handleSuspiciousActivity(supabase: SupabaseClient, reporterId: string, targetUserId: string, reason: string) {
   // Log suspicious activity
   const { error } = await supabase
     .from('suspicious_activity')
@@ -138,7 +153,7 @@ async function handleSuspiciousActivity(supabase: any, reporterId: string, targe
     });
 
   if (error) {
-    console.error('Suspicious activity logging error:', error);
+    logger.error({ error, targetUserId, reporterId }, 'Suspicious activity logging error');
     return NextResponse.json({ error: 'Failed to flag suspicious activity' }, { status: 500 });
   }
 
@@ -148,21 +163,21 @@ async function handleSuspiciousActivity(supabase: any, reporterId: string, targe
   return NextResponse.json({ success: true, message: 'Suspicious activity flagged' });
 }
 
-async function getTrustScore(supabase: any, userId: string) {
+async function getTrustScore(supabase: SupabaseClient, userId: string) {
   // Calculate trust score based on various factors
   const trustScore = await calculateTrustScore(supabase, userId);
 
   return NextResponse.json({ trustScore });
 }
 
-async function performSafetyCheck(supabase: any, userId: string) {
+async function performSafetyCheck(supabase: SupabaseClient, userId: string) {
   // Perform comprehensive safety check
   const safetyResult = await performComprehensiveSafetyCheck(supabase, userId);
 
   return NextResponse.json(safetyResult);
 }
 
-async function getUserReports(supabase: any, userId: string) {
+async function getUserReports(supabase: SupabaseClient, userId: string) {
   // Check if user is admin
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -185,14 +200,14 @@ async function getUserReports(supabase: any, userId: string) {
     .limit(50);
 
   if (error) {
-    console.error('Reports fetch error:', error);
+    logger.error({ error, userId }, 'Reports fetch error');
     return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 });
   }
 
   return NextResponse.json({ reports: reports || [] });
 }
 
-async function moderateContent(content: any) {
+async function moderateContent(content: ContentToModerate): Promise<ModerationResult> {
   // Basic content moderation logic
   const text = content.text || content.toString().toLowerCase();
 
@@ -207,7 +222,7 @@ async function moderateContent(content: any) {
   };
 }
 
-async function calculateTrustScore(supabase: any, userId: string) {
+async function calculateTrustScore(supabase: SupabaseClient, userId: string): Promise<number> {
   let score = 50; // Base score
 
   // Factor 1: Verification status
@@ -230,9 +245,9 @@ async function calculateTrustScore(supabase: any, userId: string) {
   score -= (reportCount || 0) * 5;
 
   // Factor 3: Account age
-  const { data: user } = await supabase.auth.admin.getUserById(userId);
-  if (user?.created_at) {
-    const accountAge = Date.now() - new Date(user.created_at).getTime();
+  const { data: userData } = await supabase.auth.admin.getUserById(userId);
+  if (userData?.user?.created_at) {
+    const accountAge = Date.now() - new Date(userData.user.created_at).getTime();
     const daysOld = accountAge / (1000 * 60 * 60 * 24);
     score += Math.min(daysOld / 30, 10); // Up to 10 points for accounts older than 30 days
   }
@@ -243,7 +258,7 @@ async function calculateTrustScore(supabase: any, userId: string) {
   return Math.max(0, Math.min(100, score));
 }
 
-async function updateTrustScore(supabase: any, userId: string, change: number) {
+async function updateTrustScore(supabase: SupabaseClient, userId: string, change: number): Promise<void> {
   const currentScore = await calculateTrustScore(supabase, userId);
   const newScore = Math.max(0, Math.min(100, currentScore + change));
 
@@ -259,7 +274,7 @@ async function updateTrustScore(supabase: any, userId: string, change: number) {
     });
 }
 
-async function performComprehensiveSafetyCheck(supabase: any, userId: string) {
+async function performComprehensiveSafetyCheck(supabase: SupabaseClient, userId: string) {
   const checks = {
     identityVerified: false,
     backgroundCheck: false,
@@ -306,7 +321,7 @@ async function performComprehensiveSafetyCheck(supabase: any, userId: string) {
   return checks;
 }
 
-async function assessUserRisk(supabase: any, userId: string) {
+async function assessUserRisk(supabase: SupabaseClient, userId: string) {
   const { TrustSafetyService } = await import('@/services/trust-safety-svc');
   const trustSafetyService = new TrustSafetyService();
 
@@ -314,12 +329,12 @@ async function assessUserRisk(supabase: any, userId: string) {
     const riskAssessment = await trustSafetyService.calculateAdvancedTrustScore(userId);
     return NextResponse.json(riskAssessment);
   } catch (error) {
-    console.error('Risk assessment error:', error);
+    logger.error({ error, userId }, 'Risk assessment error');
     return NextResponse.json({ error: 'Failed to assess user risk' }, { status: 500 });
   }
 }
 
-async function performAdvancedFraudCheck(supabase: any, userId: string, req: NextRequest) {
+async function performAdvancedFraudCheck(supabase: SupabaseClient, userId: string, req: NextRequest) {
   const { TrustSafetyService } = await import('@/services/trust-safety-svc');
   const trustSafetyService = new TrustSafetyService();
 
@@ -347,7 +362,7 @@ async function performAdvancedFraudCheck(supabase: any, userId: string, req: Nex
       riskDetected: alerts.some(alert => alert.severity === 'high' || alert.severity === 'critical'),
     });
   } catch (error) {
-    console.error('Advanced fraud check error:', error);
+    logger.error({ error, userId }, 'Advanced fraud check error');
     return NextResponse.json({ error: 'Failed to perform fraud check' }, { status: 500 });
   }
 }
