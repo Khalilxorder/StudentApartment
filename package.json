@@ -122,7 +122,6 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-react": "^5.30.3",
     "tailwind-merge": "^3.3.1",
-    "transformers": "^3.0.0",
     "use-places-autocomplete": "^4.0.1",
     "uuid": "^11.1.0",
     "zod": "^4.1.12"
@@ -161,5 +160,12 @@
     "tsx": "^4.7.0",
     "typescript": "^5",
     "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "inflight": "npm:lru-cache@^10.0.0",
+    "glob": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
