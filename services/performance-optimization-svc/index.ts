@@ -54,16 +54,29 @@ export interface PerformanceReport {
 }
 
 export class PerformanceOptimizationService {
-  private supabase: any;
+  private _supabase: any = null;
   private memoryCache = new Map<string, CacheEntry>();
   private optimizationRules: OptimizationRule[] = [];
+  private rulesLoaded = false;
+
+  private getSupabase(): any {
+    if (!this._supabase) {
+      this._supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this._supabase;
+  }
+
+  private async ensureRulesLoaded(): Promise<void> {
+    if (!this.rulesLoaded) {
+      await this.loadOptimizationRules();
+    }
+  }
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    this.loadOptimizationRules();
+    // Lazy initialize - don't access process.env at module load time
   }
 
   /**
@@ -71,7 +84,7 @@ export class PerformanceOptimizationService {
    */
   private async loadOptimizationRules(): Promise<void> {
     try {
-      const { data: rules, error } = await this.supabase
+      const { data: rules, error } = await this.getSupabase()
         .from('optimization_rules')
         .select('*')
         .eq('enabled', true)
@@ -88,8 +101,10 @@ export class PerformanceOptimizationService {
           priority: rule.priority,
         }));
       }
+      this.rulesLoaded = true;
     } catch (error) {
       console.error('Load optimization rules error:', error);
+      this.rulesLoaded = true; // Mark as loaded even on error to prevent infinite retries
     }
   }
 
@@ -101,7 +116,7 @@ export class PerformanceOptimizationService {
       // Store in memory for quick access
       // In production, you might want to batch these
 
-      await this.supabase
+      await this.getSupabase()
         .from('performance_metrics')
         .insert({
           endpoint: metric.endpoint,
@@ -137,7 +152,7 @@ export class PerformanceOptimizationService {
       }
 
       // Check database cache
-      const { data: dbEntry, error } = await this.supabase
+      const { data: dbEntry, error } = await this.getSupabase()
         .from('cache_entries')
         .select('*')
         .eq('key', key)
@@ -146,7 +161,7 @@ export class PerformanceOptimizationService {
 
       if (!error && dbEntry) {
         // Update access stats
-        await this.supabase
+        await this.getSupabase()
           .from('cache_entries')
           .update({
             access_count: dbEntry.access_count + 1,
@@ -188,7 +203,7 @@ export class PerformanceOptimizationService {
       });
 
       // Store in database cache
-      await this.supabase
+      await this.getSupabase()
         .from('cache_entries')
         .upsert({
           key,
@@ -221,7 +236,7 @@ export class PerformanceOptimizationService {
 
       // Invalidate database cache
       if (tags.length > 0) {
-        await this.supabase
+        await this.getSupabase()
           .from('cache_entries')
           .delete()
           .overlaps('tags', tags);
@@ -295,7 +310,7 @@ export class PerformanceOptimizationService {
   ): Promise<PerformanceReport> {
     try {
       // Get metrics from database
-      const { data: metrics, error } = await this.supabase
+      const { data: metrics, error } = await this.getSupabase()
         .from('performance_metrics')
         .select('*')
         .gte('created_at', startDate.toISOString())
@@ -378,7 +393,7 @@ export class PerformanceOptimizationService {
    */
   private async calculateCacheHitRate(startDate: Date, endDate: Date): Promise<number> {
     try {
-      const { data: cacheEntries, error } = await this.supabase
+      const { data: cacheEntries, error } = await this.getSupabase()
         .from('cache_entries')
         .select('access_count')
         .gte('last_accessed', startDate.toISOString())
@@ -447,7 +462,7 @@ export class PerformanceOptimizationService {
       console.warn(`Slow response detected: ${metric.endpoint} took ${metric.responseTime}ms`);
 
       // Store alert in database
-      await this.supabase
+      await this.getSupabase()
         .from('performance_alerts')
         .insert({
           type: 'slow_response',

@@ -28,13 +28,20 @@ export interface ProcessedMedia {
 }
 
 export class MediaPipelineService {
-  private supabase: any;
+  private _supabase: any = null;
+
+  private getSupabase(): any {
+    if (!this._supabase) {
+      this._supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this._supabase;
+  }
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialize - don't access process.env at module load time
   }
 
   /**
@@ -75,7 +82,7 @@ export class MediaPipelineService {
 
       // Upload optimized image
       const optimizedPath = `apartments/${apartmentId}/${fileId}_optimized.webp`;
-      const { data: optimizedUpload, error: optimizedError } = await this.supabase.storage
+      const { data: optimizedUpload, error: optimizedError } = await this.getSupabase().storage
         .from('apartment-media')
         .upload(optimizedPath, optimizedBuffer, {
           contentType: 'image/webp',
@@ -93,7 +100,7 @@ export class MediaPipelineService {
           .toBuffer();
 
         const thumbnailPath = `apartments/${apartmentId}/${fileId}_thumb.webp`;
-        const { data: thumbUpload, error: thumbError } = await this.supabase.storage
+        const { data: thumbUpload, error: thumbError } = await this.getSupabase().storage
           .from('apartment-media')
           .upload(thumbnailPath, thumbnailBuffer, {
             contentType: 'image/webp',
@@ -101,7 +108,7 @@ export class MediaPipelineService {
           });
 
         if (!thumbError) {
-          thumbnailUrl = this.supabase.storage
+          thumbnailUrl = this.getSupabase().storage
             .from('apartment-media')
             .getPublicUrl(thumbnailPath).data.publicUrl;
         }
@@ -123,12 +130,12 @@ export class MediaPipelineService {
       }
 
       // Get public URLs
-      const { data: optimizedPublicUrl } = this.supabase.storage
+      const { data: optimizedPublicUrl } = this.getSupabase().storage
         .from('apartment-media')
         .getPublicUrl(optimizedPath);
 
       // Store media record in database
-      const { data: mediaRecord, error: dbError } = await this.supabase
+      const { data: mediaRecord, error: dbError } = await this.getSupabase()
         .from('apartment_media')
         .insert({
           apartment_id: apartmentId,
@@ -199,7 +206,7 @@ export class MediaPipelineService {
   async deleteApartmentMedia(mediaId: string, apartmentId: string): Promise<void> {
     try {
       // Get media record
-      const { data: media, error: fetchError } = await this.supabase
+      const { data: media, error: fetchError } = await this.getSupabase()
         .from('apartment_media')
         .select('file_url, thumbnail_url')
         .eq('id', mediaId)
@@ -213,20 +220,20 @@ export class MediaPipelineService {
       const filePath = urlParts.slice(-3).join('/'); // apartments/{id}/{filename}
 
       // Delete from storage
-      await this.supabase.storage
+      await this.getSupabase().storage
         .from('apartment-media')
         .remove([filePath]);
 
       if (media.thumbnail_url) {
         const thumbParts = media.thumbnail_url.split('/');
         const thumbPath = thumbParts.slice(-3).join('/');
-        await this.supabase.storage
+        await this.getSupabase().storage
           .from('apartment-media')
           .remove([thumbPath]);
       }
 
       // Delete from database
-      const { error: deleteError } = await this.supabase
+      const { error: deleteError } = await this.getSupabase()
         .from('apartment_media')
         .delete()
         .eq('id', mediaId);
@@ -245,13 +252,13 @@ export class MediaPipelineService {
   async setPrimaryImage(apartmentId: string, mediaId: string): Promise<void> {
     try {
       // First, unset all primary flags for this apartment
-      await this.supabase
+      await this.getSupabase()
         .from('apartment_media')
         .update({ is_primary: false })
         .eq('apartment_id', apartmentId);
 
       // Then set the new primary
-      const { error } = await this.supabase
+      const { error } = await this.getSupabase()
         .from('apartment_media')
         .update({ is_primary: true })
         .eq('id', mediaId)
@@ -284,7 +291,7 @@ export class MediaPipelineService {
 
       // Upload avatar
       const avatarPath = `profiles/${userId}/${fileId}_avatar.webp`;
-      const { error: uploadError } = await this.supabase.storage
+      const { error: uploadError } = await this.getSupabase().storage
         .from('profile-media')
         .upload(avatarPath, avatarBuffer, {
           contentType: 'image/webp',
@@ -294,12 +301,12 @@ export class MediaPipelineService {
       if (uploadError) throw uploadError;
 
       // Get public URL
-      const { data: publicUrl } = this.supabase.storage
+      const { data: publicUrl } = this.getSupabase().storage
         .from('profile-media')
         .getPublicUrl(avatarPath);
 
       // Update user profile
-      const { error: updateError } = await this.supabase
+      const { error: updateError } = await this.getSupabase()
         .from('profiles')
         .update({ avatar_url: publicUrl.publicUrl })
         .eq('id', userId);

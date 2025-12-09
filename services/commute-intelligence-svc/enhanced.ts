@@ -32,14 +32,21 @@ export interface University {
 }
 
 export class CommuteIntelligenceService {
-  private supabase: any;
+  private _supabase: any = null;
   private commuteCacheMinutes = 1440; // 24 hours
 
+  private getSupabase(): any {
+    if (!this._supabase) {
+      this._supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return this._supabase;
+  }
+
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Lazy initialize - don't access process.env at module load time
   }
 
   /**
@@ -87,7 +94,7 @@ export class CommuteIntelligenceService {
   ): Promise<CommuteResult | null> {
     try {
       // Query pre-processed GTFS data from Supabase
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getSupabase()
         .from('gtfs_routes')
         .select('*')
         .filter('from_lat', 'gte', fromLat - 0.05)
@@ -259,13 +266,13 @@ export class CommuteIntelligenceService {
     mode: string = 'transit'
   ): Promise<CommuteResult | null> {
     try {
-      const { data: apartment } = await this.supabase
+      const { data: apartment } = await this.getSupabase()
         .from('apartments')
         .select('latitude, longitude')
         .eq('id', apartmentId)
         .single();
 
-      const { data: university } = await this.supabase
+      const { data: university } = await this.getSupabase()
         .from('universities')
         .select('latitude, longitude')
         .eq('id', universityId)
@@ -321,7 +328,7 @@ export class CommuteIntelligenceService {
    */
   async getUniversities(): Promise<University[]> {
     try {
-      const { data } = await this.supabase
+      const { data } = await this.getSupabase()
         .from('universities')
         .select('id, name, latitude, longitude, address')
         .order('name');
@@ -338,7 +345,7 @@ export class CommuteIntelligenceService {
    */
   private async getCommuteCached(query: CommuteQuery): Promise<CommuteResult | null> {
     try {
-      const { data } = await this.supabase
+      const { data } = await this.getSupabase()
         .from('commute_cache')
         .select('*')
         .eq('from_lat', query.fromLat)
@@ -374,7 +381,7 @@ export class CommuteIntelligenceService {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    await this.supabase.from('commute_cache').insert({
+    await this.getSupabase().from('commute_cache').insert({
       from_lat: query.fromLat,
       from_lng: query.fromLng,
       to_lat: query.toLat,

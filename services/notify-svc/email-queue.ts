@@ -15,14 +15,18 @@ export interface EmailJobData {
 class EmailQueueService {
   private queue: any = null;
   private worker: any = null;
-  private resend: Resend | null;
+  private _resend: Resend | null = null;
   private initialized = false;
 
   constructor() {
     // Don't initialize in constructor - lazy initialize on first use
-    this.resend = process.env.RESEND_API_KEY
-      ? new Resend(process.env.RESEND_API_KEY)
-      : null;
+  }
+
+  private getResend(): Resend | null {
+    if (!this._resend && process.env.RESEND_API_KEY) {
+      this._resend = new Resend(process.env.RESEND_API_KEY);
+    }
+    return this._resend;
   }
 
   private async initialize() {
