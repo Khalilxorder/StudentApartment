@@ -27,6 +27,8 @@ const nextConfig = {
       config.externals.push({
         'bullmq': 'commonjs bullmq',
         'ioredis': 'commonjs ioredis',
+        'onnxruntime-node': 'commonjs onnxruntime-node',
+        'sharp': 'commonjs sharp',
       });
     }
 

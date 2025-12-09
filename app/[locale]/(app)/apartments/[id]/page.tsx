@@ -11,6 +11,7 @@ import { trackEvent } from '@/components/AnalyticsProvider';
 import { ArrowLeft, BookmarkPlus, GitCompare } from 'lucide-react';
 import { analyzeApartmentArchetype } from '@/utils/archetype-mapper';
 import ArchetypeAnalysis from '@/components/ArchetypeAnalysis';
+import type { Session } from '@supabase/supabase-js';
 
 // Dynamic imports for heavy components
 const ChatBox = dynamic(() => import('@/components/ChatBox'), {
@@ -94,7 +95,7 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showChat, setShowChat] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [savingToCompare, setSavingToCompare] = useState(false);
   const [compareSaved, setCompareSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -112,22 +113,12 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
           .single();
 
         if (apartmentError) {
-          console.error('Apartment fetch error:', apartmentError);
-          console.error('Requested ID:', params.id);
           throw apartmentError;
         }
 
         if (!apartmentData) {
-          console.error('No apartment data returned for ID:', params.id);
           throw new Error('Apartment not found');
         }
-
-        // Debug: Log owner_id status
-        console.log('Apartment loaded:', {
-          id: apartmentData.id,
-          title: apartmentData.title,
-          owner_id: apartmentData.owner_id || 'NOT SET',
-        });
 
         // Get current session
         const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -154,8 +145,8 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
           apartment_title: apartmentData.title,
           price: apartmentData.price_huf,
         });
-      } catch (error) {
-        console.error('Error fetching apartment:', error);
+      } catch {
+        // Error handled by loading state
       } finally {
         setLoading(false);
       }
@@ -176,7 +167,7 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
 
   const handleSaveToCompare = async () => {
     if (!session?.user) {
-      alert('Please sign in to save this apartment for comparison.');
+      setSaveError(t('sign_in_to_save'));
       return;
     }
 
@@ -205,9 +196,9 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
       }
 
       setCompareSaved(true);
-    } catch (error: any) {
-      console.error('Error saving for compare:', error);
-      setSaveError(error.message || 'Unable to save apartment');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : t('unable_to_save');
+      setSaveError(message);
     } finally {
       setSavingToCompare(false);
     }
@@ -455,7 +446,6 @@ export default function ApartmentDetailsPage({ params }: { params: { id: string 
                   bathrooms={apartment.bathrooms || 0}
                   floorNumber={apartment.floor_number || 0}
                   district={apartment.district || 0}
-                  // @ts-ignore
                   minimal={true}
                 />
               </div>

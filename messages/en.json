@@ -45,7 +45,13 @@
         "back_search": "Back to Search",
         "chat_unavailable": "Chat Unavailable",
         "chat_unavailable_desc": "This apartment doesn't have an owner assigned yet. Please try again later or contact support.",
-        "close": "Close"
+        "close": "Close",
+        "sign_in_to_save": "Please sign in to save this apartment for comparison.",
+        "unable_to_save": "Unable to save apartment",
+        "min_to_campus": "min to campus",
+        "preferences_matched": "Preferences matched",
+        "ai_says_fits": "AI says this fits because",
+        "price_on_request": "Price on request"
     },
     "Common": {
         "loading": "Loading...",
@@ -105,5 +111,20 @@
         "ready_desc": "Join thousands of students who have found their ideal home with our AI-powered platform",
         "get_started": "Get Started Free",
         "browse_apartments": "Browse Apartments"
+    },
+    "Favorites": {
+        "title": "My Favorites",
+        "saved_apartments": "saved apartments",
+        "no_favorites_title": "No favorites yet",
+        "no_favorites_description": "Start saving apartments you love to easily find them later",
+        "browse_apartments": "Browse Apartments"
+    },
+    "Archetype": {
+        "soul_of_apartment": "Soul of the Apartment",
+        "primary_archetype": "Primary Archetype",
+        "garden_alignment": "Garden of Eden Alignment",
+        "resonance_description": "Resonance with universal harmony & natural abundance",
+        "big_five_openness": "Big Five Openness",
+        "energy_type": "Energy Type"
     }
 }

@@ -185,23 +185,5 @@ create-verification-*.sql
 run-migrations.js
 comprehensive-*.mjs
 detailed-*.mjs
-final-*.mjs
-
-# SQL files (except migrations)
-*.sql
-!db/migrations/*.sql
-
-# Server logs
-server.log
-ci-results.txt
-*.sh
-
-# Sentry
-sentry.client.config.ts
-sentry.edge.config.ts
-sentry.server.config.ts
-instrumentation.ts.bak
-
-# Other temp files
 home.svg
 Proxy

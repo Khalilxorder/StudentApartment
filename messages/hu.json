@@ -45,7 +45,13 @@
         "back_search": "Vissza a Kereséshez",
         "chat_unavailable": "Chat Nem Elérhető",
         "chat_unavailable_desc": "Ehhez az albérlethez még nincs tulajdonos hozzárendelve. Kérlek próbáld újra később vagy lépj kapcsolatba az ügyfélszolgálattal.",
-        "close": "Bezárás"
+        "close": "Bezárás",
+        "sign_in_to_save": "Kérlek, jelentkezz be az albérlet összehasonlításhoz való mentéséhez.",
+        "unable_to_save": "Nem sikerült menteni az albérletet",
+        "min_to_campus": "perc a campusig",
+        "preferences_matched": "Preferenciák találtak",
+        "ai_says_fits": "Az AI szerint ezért passzol",
+        "price_on_request": "Ár kérésre"
     },
     "Common": {
         "loading": "Betöltés...",
@@ -105,5 +111,20 @@
         "ready_desc": "Csatlakozz több ezer diákhoz, akik már megtalálták ideális otthonukat AI vezérelt platformunkkal",
         "get_started": "Kezdés Ingyenesen",
         "browse_apartments": "Albérletek Böngészése"
+    },
+    "Favorites": {
+        "title": "Kedvenceim",
+        "saved_apartments": "mentett albérlet",
+        "no_favorites_title": "Még nincsenek kedvencek",
+        "no_favorites_description": "Kezdd el menteni a neked tetsző albérleteket, hogy később könnyen megtaláld őket",
+        "browse_apartments": "Albérletek Böngészése"
+    },
+    "Archetype": {
+        "soul_of_apartment": "Az Albérlet Lelke",
+        "primary_archetype": "Elsődleges Archetípus",
+        "garden_alignment": "Édenkert Illeszkedés",
+        "resonance_description": "Rezonancia az univerzális harmóniával és természetes bőséggel",
+        "big_five_openness": "Big Five Nyitottság",
+        "energy_type": "Energia Típus"
     }
 }

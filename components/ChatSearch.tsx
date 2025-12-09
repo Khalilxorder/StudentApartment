@@ -269,14 +269,20 @@ export default function ChatSearch() {
 
   const handleWhyThisClick = (
     apartment: any,
-    context?: { matchedFeatures?: FeatureIcon[]; matchScore?: number; aiReasons?: RecommendationReason[] }
+    context?: { matchedFeatures?: FeatureIcon[]; matchScore?: number; aiReasons?: string[] }
   ) => {
     if (!apartment) return;
 
     const matchedFeatures = context?.matchedFeatures || apartment.matchedFeatures || [];
+    // Convert string[] aiReasons from context to RecommendationReason[] format if needed
+    const contextReasons: RecommendationReason[] = context?.aiReasons?.map((reason, i) => ({
+      factor: reason,
+      description: reason,
+      weight: 0.8 - (i * 0.1)
+    })) || [];
     const explanationReasons =
-      context?.aiReasons && context.aiReasons.length > 0
-        ? context.aiReasons
+      contextReasons.length > 0
+        ? contextReasons
         : buildExplainReasons(apartment.aiReasons, matchedFeatures);
 
     const mergedResult = {

@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import FavoritesList from '@/components/FavoritesList';
+import { getTranslations } from 'next-intl/server';
 
 export default async function FavoritesPage() {
+  const t = await getTranslations('Favorites');
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -11,7 +13,7 @@ export default async function FavoritesPage() {
   }
 
   const { data: favorites } = await supabase
-    .from('favorites')
+    .from('apartment_favorites')
     .select('*, apartments(*)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
@@ -22,9 +24,9 @@ export default async function FavoritesPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Favorites</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
             <p className="text-gray-600 mt-2">
-              {favorites?.length || 0} saved apartments
+              {favorites?.length || 0} {t('saved_apartments')}
             </p>
           </div>
 

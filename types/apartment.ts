@@ -19,7 +19,6 @@ export interface Apartment {
     // Optional fields that might be present
     amenities?: string[];
     size_sqm?: number;
-    floor?: number;
     building_type?: string;
     heating_type?: string;
     owner_name?: string;

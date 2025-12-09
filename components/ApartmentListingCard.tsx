@@ -1,20 +1,43 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { SaveApartmentButton } from '@/components/SaveApartmentButton';
 import SearchOriginBadge, { determineSearchOrigin, getScoreForDisplay } from './SearchOriginBadge';
-import ExplainWhy, { RecommendationReason } from './ExplainWhy';
+import ExplainWhy from './ExplainWhy';
 import { FeatureIcon } from '@/utils/feature-icons';
+import { Apartment } from '@/types/apartment';
 
 import ApartmentImageCarousel from './ApartmentImageCarousel';
 
+// Extended apartment type with AI search fields
+interface ApartmentWithAI extends Apartment {
+    featureTags?: string[];
+    aiScore?: number;
+    featureMatchScore?: number;
+    aiReasons?: string[];
+    aiCompromises?: string[];
+    pet_friendly?: boolean;
+    parking_available?: boolean;
+    internet_included?: boolean;
+    laundry_in_unit?: boolean;
+    elevator?: boolean;
+    distance_to_metro_m?: number;
+    distance_to_university_m?: number;
+    price?: number; // Alternate price field
+}
+
+interface WhyThisContext {
+    matchedFeatures: FeatureIcon[];
+    matchScore: number;
+    aiReasons: string[];
+}
+
 interface ApartmentListingCardProps {
-    apt: any;
+    apt: ApartmentWithAI;
     userWishedFeatures?: FeatureIcon[];
     favoriteIds?: string[];
     onToggleFavorite: (id: string) => void;
-    onWhyThisClick?: (apt: any, context: any) => void;
+    onWhyThisClick?: (apt: ApartmentWithAI, context: WhyThisContext) => void;
 }
 
 export default function ApartmentListingCard({
@@ -38,8 +61,8 @@ export default function ApartmentListingCard({
         if (apt.elevator) apartmentFeatures.push('amen_elevator');
 
         if (Array.isArray(apt.amenities)) {
-            apt.amenities.forEach((amenity: any) => {
-                const amenityLower = (typeof amenity === 'string' ? amenity : amenity.label || '').toLowerCase();
+            apt.amenities.forEach((amenity) => {
+                const amenityLower = (typeof amenity === 'string' ? amenity : '').toLowerCase();
                 if (amenityLower.includes('balcony')) apartmentFeatures.push('amen_balcony');
                 if (amenityLower.includes('terrace')) apartmentFeatures.push('amen_terrace');
                 if (amenityLower.includes('garden')) apartmentFeatures.push('amen_garden');
@@ -62,8 +85,13 @@ export default function ApartmentListingCard({
     const origin = determineSearchOrigin(apt);
     const badgeScore = getScoreForDisplay(apt) ?? userScore;
 
-    // Explain reasons
-    const explainReasons = apt.aiReasons || [];
+    // Explain reasons - convert strings to RecommendationReason format if needed
+    const rawReasons = apt.aiReasons || [];
+    const explainReasons = rawReasons.map((reason: string, index: number) => ({
+        factor: reason,
+        weight: 0.8 - (index * 0.1), // Decreasing weight
+        description: reason
+    }));
     const compromiseList = Array.isArray(apt.aiCompromises) ? apt.aiCompromises.filter(Boolean).slice(0, 2) : [];
 
     // Commute
@@ -87,10 +115,10 @@ export default function ApartmentListingCard({
     const districtLabel = apt.district ? `${t('district')} ${apt.district}` : `${t('district')} -`;
     const bedroomLabel = typeof apt.bedrooms === 'number'
         ? `${apt.bedrooms} ${t('beds')}`
-        : `Beds -`;
+        : `${t('beds')} -`;
     const bathroomLabel = typeof apt.bathrooms === 'number'
         ? `${apt.bathrooms} ${t('baths')}`
-        : `Baths -`;
+        : `${t('baths')} -`;
 
     return (
         <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden border border-gray-200">
@@ -134,7 +162,7 @@ export default function ApartmentListingCard({
                     <SearchOriginBadge
                         origin={origin}
                         score={badgeScore}
-                        onClick={onWhyThisClick ? () => onWhyThisClick(apt, { matchedFeatures, matchScore: userScore, aiReasons: explainReasons }) : undefined}
+                        onClick={onWhyThisClick ? () => onWhyThisClick(apt, { matchedFeatures, matchScore: userScore, aiReasons: rawReasons }) : undefined}
                         className="mt-1"
                     />
                 </div>
@@ -147,12 +175,12 @@ export default function ApartmentListingCard({
                 </div>
 
                 {commuteMinutes !== null && (
-                    <div className="text-xs text-gray-500">≈ {commuteMinutes} min to campus</div>
+                    <div className="text-xs text-gray-500">≈ {commuteMinutes} {t('min_to_campus')}</div>
                 )}
 
                 {matchedFeatures.length > 0 && (
                     <div>
-                        <div className="text-xs font-semibold text-gray-700 mb-1">Preferences matched</div>
+                        <div className="text-xs font-semibold text-gray-700 mb-1">{t('preferences_matched')}</div>
                         <div className="flex flex-wrap gap-1.5">
                             {matchedFeatures.slice(0, 4).map(f => (
                                 <span key={f.id} className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">
@@ -166,7 +194,7 @@ export default function ApartmentListingCard({
                 {explainReasons.length > 0 && (
                     <ExplainWhy
                         reasons={explainReasons}
-                        title="AI says this fits because"
+                        title={t('ai_says_fits')}
                         className="bg-transparent border-0 shadow-none p-0"
                     />
                 )}
@@ -174,7 +202,7 @@ export default function ApartmentListingCard({
                 <div className="flex gap-2 pt-2">
                     {onWhyThisClick && (
                         <button
-                            onClick={() => onWhyThisClick(apt, { matchedFeatures, matchScore: userScore, aiReasons: explainReasons })}
+                            onClick={() => onWhyThisClick(apt, { matchedFeatures, matchScore: userScore, aiReasons: rawReasons })}
                             className="flex-1 text-sm px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg transition min-h-[44px]"
                         >
                             {t('why_this')}

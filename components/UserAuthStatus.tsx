@@ -90,7 +90,7 @@ export default function UserAuthStatus() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
+      async (_event, session) => {
         const nextUser = session?.user ?? null;
         setUser(nextUser);
 
@@ -213,7 +213,7 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
       .maybeSingle();
 
     if (error) {
-      console.warn('Error loading profile:', error);
+      // Profile load error - continue with fallback
     }
 
     // If we have a profile, return it
@@ -235,8 +235,7 @@ async function loadProfile(user: User): Promise<UserProfileSummary | null> {
       avatarUrl: fallbackAvatar,
     };
 
-  } catch (error) {
-    console.error('Failed to load user profile summary', error);
+  } catch {
     // Return basic profile from auth metadata
     const metadata = user.user_metadata ?? {};
     return {
