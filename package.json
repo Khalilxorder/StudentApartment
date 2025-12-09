@@ -162,8 +162,7 @@
     "vitest": "^2.1.9"
   },
   "overrides": {
-    "inflight": "npm:lru-cache@^10.0.0",
-    "glob": "^11.0.0"
+    "inflight": "npm:lru-cache@^10.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
