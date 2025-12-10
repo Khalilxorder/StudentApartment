@@ -483,6 +483,7 @@ export class PerformanceOptimizationService {
 
   /**
    * Optimize images (utility function)
+   * NOTE: Disabled in serverless - requires sharp native module
    */
   async optimizeImage(buffer: Buffer, options: {
     maxWidth?: number;
@@ -490,22 +491,8 @@ export class PerformanceOptimizationService {
     quality?: number;
     format?: 'webp' | 'jpeg' | 'png';
   } = {}): Promise<Buffer> {
-    const { default: sharp } = await import('sharp');
-
-    const {
-      maxWidth = 1920,
-      maxHeight = 1080,
-      quality = 85,
-      format = 'webp',
-    } = options;
-
-    return sharp(buffer)
-      .resize(maxWidth, maxHeight, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .webp({ quality })
-      .toBuffer();
+    // Sharp is not available in Vercel serverless environment
+    throw new Error('Image optimization is disabled in serverless environment. Sharp is required.');
   }
 
   /**
