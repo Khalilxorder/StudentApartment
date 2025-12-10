@@ -116,7 +116,6 @@
     "react-dom": "^18",
     "resend": "^6.1.2",
     "selenium-webdriver": "^4.38.0",
-    "sharp": "^0.33.5",
     "stripe": "^19.1.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-react": "^5.30.3",
