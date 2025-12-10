@@ -13,11 +13,11 @@ const nextConfig = {
       loader: 'ignore-loader',
     });
 
-    // Exclude services that use native modules (sharp) from build
+    // Exclude services that use native modules (sharp, bullmq, ioredis) from build
     // These are server-only and should not be bundled at build time
     config.module.rules.push({
       test: /\.ts$/,
-      include: /services\/(media-pipeline-svc|performance-optimization-svc)/,
+      include: /services\/(media-pipeline-svc|performance-optimization-svc|notify-svc)/,
       loader: 'ignore-loader',
     });
 
