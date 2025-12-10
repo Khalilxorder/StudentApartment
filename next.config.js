@@ -13,6 +13,14 @@ const nextConfig = {
       loader: 'ignore-loader',
     });
 
+    // Exclude services that use native modules (sharp) from build
+    // These are server-only and should not be bundled at build time
+    config.module.rules.push({
+      test: /\.ts$/,
+      include: /services\/(media-pipeline-svc|performance-optimization-svc)/,
+      loader: 'ignore-loader',
+    });
+
     // Enable polling for network share compatibility
     config.watchOptions = {
       poll: 1000,           // Check for changes every second
