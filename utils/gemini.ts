@@ -80,7 +80,8 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
               topP: 0.95,
               maxOutputTokens: 8192,
             }
-          })
+          }),
+          signal: AbortSignal.timeout(15000) // 15 second timeout
         });
 
         if (!response.ok) {
@@ -135,7 +136,8 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
                 topP: 0.95,
                 maxOutputTokens: 8192,
               }
-            })
+            }),
+            signal: AbortSignal.timeout(15000) // 15 second timeout
           });
 
           if (!response.ok) {

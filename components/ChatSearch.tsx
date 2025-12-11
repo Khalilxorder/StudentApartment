@@ -801,7 +801,8 @@ export default function ChatSearch() {
           story: sanitizedStory,
           preferences: localParse,
           askedQuestions: Array.from(askedQuestions)
-        })
+        }),
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       if (response.ok) {
