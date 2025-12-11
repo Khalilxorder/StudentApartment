@@ -29,6 +29,7 @@ declare module 'ioredis' {
 
     export class Redis {
         constructor(url?: string);
+        constructor(url: string, options?: RedisOptions);
         constructor(port?: number, host?: string, options?: RedisOptions);
         constructor(options?: RedisOptions);
 
