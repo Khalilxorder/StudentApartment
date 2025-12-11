@@ -1,7 +1,8 @@
 // Type declarations for sharp (externalized module)
 // This file satisfies TypeScript during build when sharp is externalized via webpack
 
-declare module 'sharp' {
+// Namespace declaration for sharp.Sharp type references
+declare namespace sharp {
     interface SharpOptions {
         failOnError?: boolean;
         pages?: number;
@@ -46,6 +47,7 @@ declare module 'sharp' {
             minY: number;
             maxX: number;
             maxY: number;
+            variance?: number;
         }>;
         isOpaque: boolean;
         entropy: number;
@@ -102,8 +104,12 @@ declare module 'sharp' {
         trim(options?: { background?: string | { r: number; g: number; b: number }; threshold?: number }): Sharp;
         extend(options: { top?: number; left?: number; bottom?: number; right?: number; extendWith?: string; background?: string | { r: number; g: number; b: number; alpha?: number } } | number): Sharp;
     }
+}
 
-    function sharp(input?: Buffer | string, options?: SharpOptions): Sharp;
+// Function declaration for sharp(input) calls
+declare function sharp(input?: Buffer | string, options?: sharp.SharpOptions): sharp.Sharp;
 
+// Module declaration for import sharp from 'sharp'
+declare module 'sharp' {
     export = sharp;
 }
