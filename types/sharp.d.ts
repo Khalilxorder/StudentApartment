@@ -103,6 +103,24 @@ declare namespace sharp {
         extract(options: { left: number; top: number; width: number; height: number }): Sharp;
         trim(options?: { background?: string | { r: number; g: number; b: number }; threshold?: number }): Sharp;
         extend(options: { top?: number; left?: number; bottom?: number; right?: number; extendWith?: string; background?: string | { r: number; g: number; b: number; alpha?: number } } | number): Sharp;
+        ensureAlpha(alpha?: number): Sharp;
+        removeAlpha(): Sharp;
+        extractChannel(channel: 0 | 1 | 2 | 3 | 'red' | 'green' | 'blue' | 'alpha'): Sharp;
+        joinChannel(images: string | Buffer | ArrayLike<string | Buffer>, options?: { raw?: { width: number; height: number; channels: number } }): Sharp;
+        bandbool(boolOp: 'and' | 'or' | 'eor'): Sharp;
+        tiff(options?: { quality?: number; compression?: string; predictor?: string; pyramid?: boolean; bitdepth?: number; tile?: boolean; tileWidth?: number; tileHeight?: number }): Sharp;
+        avif(options?: { quality?: number; lossless?: boolean; effort?: number; chromaSubsampling?: string }): Sharp;
+        heif(options?: { quality?: number; compression?: string; lossless?: boolean; effort?: number; chromaSubsampling?: string }): Sharp;
+        gif(options?: { reoptimise?: boolean; colors?: number; effort?: number; dither?: number; loop?: number; delay?: number | number[] }): Sharp;
+        composite(images: Array<{ input: Buffer | string; gravity?: string; top?: number; left?: number; tile?: boolean; blend?: string; density?: number; raw?: { width: number; height: number; channels: number } }>): Sharp;
+        affine(matrix: [number, number, number, number], options?: { background?: string | { r: number; g: number; b: number; alpha?: number }; idx?: number; idy?: number; odx?: number; ody?: number; interpolator?: string }): Sharp;
+        median(size?: number): Sharp;
+        threshold(threshold?: number, options?: { greyscale?: boolean }): Sharp;
+        boolean(operand: string | Buffer, operator: 'and' | 'or' | 'eor', options?: { raw?: { width: number; height: number; channels: number } }): Sharp;
+        linear(a?: number | number[], b?: number | number[]): Sharp;
+        recomb(inputMatrix: number[][]): Sharp;
+        unflatten(): Sharp;
+        clone(): Sharp;
     }
 }
 
