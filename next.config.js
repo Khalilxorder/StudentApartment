@@ -46,12 +46,25 @@ const nextConfig = {
     // This prevents Next.js from bundling them during build
     if (isServer) {
       config.externals = config.externals || [];
-      config.externals.push({
-        'bullmq': 'commonjs bullmq',
-        'ioredis': 'commonjs ioredis',
-        'onnxruntime-node': 'commonjs onnxruntime-node',
-        'sharp': 'commonjs sharp',
-      });
+      config.externals.push(
+        'onnxruntime-node',
+        'sharp',
+        ({ request }, callback) => {
+          // Externalize bullmq and ioredis to prevent worker thread issues
+          if (request === 'bullmq' || request === 'ioredis') {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        }
+      );
+
+      // During Vercel build, replace bullmq with a stub to prevent runtime errors
+      if (process.env.VERCEL) {
+        config.resolve = config.resolve || {};
+        config.resolve.alias = config.resolve.alias || {};
+        // Stub out bullmq entirely - it's not used in the main app
+        config.resolve.alias['bullmq'] = false;
+      }
     }
 
     return config;
