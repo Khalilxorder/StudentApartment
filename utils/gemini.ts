@@ -1,7 +1,11 @@
 // Using REST API directly to avoid SDK compatibility issues
 // Try primary key first, fall back to secondary key if available
 function getApiKey(): string {
-  return process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
+  const key = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
+  if (!key) {
+    console.error('❌ GOOGLE_AI_API_KEY or GOOGLE_GEMINI_API_KEY is not set!');
+  }
+  return key;
 }
 
 // Lazy-load API key to ensure env vars are loaded
@@ -36,16 +40,16 @@ export const MODELS = {
 // Generate response from text prompt using REST API with parallel failover
 export async function generateTextResponse(prompt: string, context?: string): Promise<string> {
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
-  
+
   // Create request hash for deduplication
   const requestHash = Buffer.from(fullPrompt).toString('base64').substring(0, 32);
-  
+
   // Check if this exact request is already in progress
   if (pendingRequests.has(requestHash)) {
     console.log('🔄 Reusing pending request for duplicate prompt');
     return pendingRequests.get(requestHash)!;
   }
-  
+
   // Try different models in order of preference (using available Gemini models)
   const modelsToTry = [
     'gemini-2.0-flash', // Standard Flash 2.0 - stable and fast
@@ -59,7 +63,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
     const parallelAttempts = modelsToTry.slice(0, 2).map(async (modelName) => {
       try {
         const url = `${API_URL}/${modelName}:generateContent?key=${apiKey}`;
-        
+
         console.log(`🤖 Server: Analyzing story with ${modelName}...`);
         const response = await fetch(url, {
           method: 'POST',
@@ -92,12 +96,12 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
 
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
+
         if (text) {
           console.log(`✅ Success with model: ${modelName}`);
           return text;
         }
-        
+
         throw new Error(`No text in response from ${modelName}`);
       } catch (error) {
         console.log(`⚠️ Model ${modelName} failed:`, error);
@@ -110,12 +114,12 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
       return await Promise.race(parallelAttempts);
     } catch (raceError) {
       console.log('⚠️ Parallel attempts failed, trying sequential fallback...');
-      
+
       // Sequential fallback with remaining models
       for (const modelName of modelsToTry.slice(2)) {
         try {
           const url = `${API_URL}/${modelName}:generateContent?key=${apiKey}`;
-          
+
           const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -147,7 +151,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
 
           const data = await response.json();
           const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
+
           if (text) {
             console.log(`✅ Success with fallback model: ${modelName}`);
             return text;
@@ -157,7 +161,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
           continue;
         }
       }
-      
+
       throw new Error('Failed to generate AI response with any model');
     }
   };
@@ -166,7 +170,7 @@ export async function generateTextResponse(prompt: string, context?: string): Pr
   const requestPromise = makeRequest().finally(() => {
     pendingRequests.delete(requestHash);
   });
-  
+
   pendingRequests.set(requestHash, requestPromise);
   return requestPromise;
 }
@@ -197,7 +201,7 @@ Be specific and extract exact values where possible. Return ONLY valid JSON, no 
   `;
 
   const response = await generateTextResponse(prompt);
-  
+
   try {
     // Remove markdown code blocks if present
     const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
@@ -285,17 +289,17 @@ Be specific about why this apartment matches or doesn't match. Return ONLY valid
   `;
 
   const response = await generateTextResponse(prompt);
-  
+
   try {
     const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
     const result = JSON.parse(cleanResponse);
-    
+
     // Cache the result
     scoringCache.set(cacheKey, {
       result,
       timestamp: Date.now()
     });
-    
+
     return result;
   } catch (error) {
     console.error('Failed to parse scoring response:', error);

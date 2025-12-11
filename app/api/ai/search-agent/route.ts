@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ollamaClient } from '@/lib/llm/client';
+import { generateTextResponse } from '@/utils/gemini';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { SearchGoal } from '@/components/SearchGoalCard';
@@ -18,6 +18,24 @@ const createClient = () => {
         }
     );
 };
+
+// Generate JSON response from Gemini
+async function generateSearchAgentResponse(systemPrompt: string): Promise<{ updated_goal: SearchGoal; response_text: string }> {
+    try {
+        const response = await generateTextResponse(systemPrompt);
+
+        // Extract JSON from response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            throw new Error('No JSON found in response');
+        }
+
+        return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+        logger.warn({ err: error }, 'JSON generation failed');
+        throw error;
+    }
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -50,31 +68,23 @@ OUTPUT FORMAT (JSON ONLY):
 }
 `;
 
-        // 2. Call LLM
-        let llmResult;
+        // 2. Call Gemini API (serverless compatible)
+        let result;
         try {
-            llmResult = await ollamaClient.generateJSON<{ updated_goal: SearchGoal; response_text: string }>(
-                systemPrompt,
-                { temperature: 0.2 } // Low temp for stability
-            );
+            result = await generateSearchAgentResponse(systemPrompt);
         } catch (err) {
-            logger.warn({ err }, 'LLM Generation failed, falling back to simple echo');
-            // Fallback if LLM fails (e.g. offline)
-            llmResult = {
+            logger.warn({ err }, 'AI generation failed, returning fallback response');
+            // Fallback if AI fails
+            result = {
                 updated_goal: currentGoal,
-                response_text: "I'm having trouble connecting to my AI brain right now, but I heard you. Could you repeat that?"
+                response_text: "I understand. Could you tell me more about what you're looking for? For example: your budget, preferred location, or must-have features?"
             };
         }
 
-        const { updated_goal, response_text } = llmResult;
+        const { updated_goal, response_text } = result;
 
         // 3. Persist to Supabase (if we have a session)
         if (sessionToken) {
-            // Ideally we'd look up the session_id by token and insert message
-            // For now, we'll trust the client to handle the bulk of state or just return the computed state
-            // Detailed DB persistence logic can be added here if we want server-side history authority
-
-            // Example: Update session goal
             const { error } = await supabase
                 .from('ai_search_sessions')
                 .update({ current_goal: updated_goal, last_active_at: new Date().toISOString() })
@@ -92,7 +102,7 @@ OUTPUT FORMAT (JSON ONLY):
     } catch (error) {
         logger.error({ error }, 'Search Agent Error');
         return NextResponse.json(
-            { error: 'Internal Server Error' },
+            { error: 'Internal Server Error', message: error instanceof Error ? error.message : 'Unknown' },
             { status: 500 }
         );
     }
