@@ -3,7 +3,8 @@
 
 import { createClient, createServiceClient } from '@/utils/supabaseClient';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import sharp from 'sharp';
+// sharp import removed for Vercel serverless compatibility
+// Image processing disabled - photo hashing will return placeholder
 
 export interface DuplicateDetectionResult {
   apartmentId: string;
@@ -296,7 +297,7 @@ class EnhancedDuplicateDetectionService {
    */
   private scoreGeographicProximity(apt1: ApartmentData, apt2: ApartmentData): number {
     if (apt1.latitude === null || apt1.longitude === null ||
-        apt2.latitude === null || apt2.longitude === null) {
+      apt2.latitude === null || apt2.longitude === null) {
       return 0;
     }
 
@@ -408,30 +409,13 @@ class EnhancedDuplicateDetectionService {
 
   /**
    * Generate perceptual hash for an image (pHash)
-   * Simple version - in production would use a proper pHash library
+   * DISABLED: sharp not available in Vercel serverless
+   * Returns placeholder hash
    */
-  async generatePhash(imageBuffer: Buffer): Promise<bigint> {
-    try {
-      // Resize to 8x8 for simple pHash
-      const resized = await sharp(imageBuffer)
-        .resize(8, 8, { fit: 'cover' })
-        .grayscale()
-        .raw()
-        .toBuffer();
-
-      // Convert to hash
-      let hash = BigInt(0);
-      for (let i = 0; i < resized.length; i++) {
-        if (resized[i] > 128) {
-          hash |= (BigInt(1) << BigInt(i % 64));
-        }
-      }
-
-      return hash;
-    } catch (error) {
-      console.error('Error generating pHash:', error);
-      return BigInt(0);
-    }
+  async generatePhash(_imageBuffer: Buffer): Promise<bigint> {
+    // Photo hashing disabled for serverless deployment
+    // Return a placeholder hash
+    return BigInt(0);
   }
 
   /**
@@ -503,9 +487,9 @@ class EnhancedDuplicateDetectionService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }

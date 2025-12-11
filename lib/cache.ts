@@ -30,21 +30,10 @@ class CacheService {
   }
 
   private async initializeRedis() {
-    try {
-      if (process.env.REDIS_URL) {
-        // Dynamically import Redis only if needed
-        const { Redis } = await import('ioredis');
-        this.redis = new Redis(process.env.REDIS_URL);
-        this.redis.on('error', (err: any) => {
-          // Suppress connection errors to allow fallback to memory cache
-          console.warn('Redis connection error, using fallback:', err.message);
-          this.redis = null;
-        });
-        console.log('✅ Redis cache connected');
-      }
-    } catch (error) {
-      console.warn('⚠️ Redis not available, using in-memory cache fallback');
-    }
+    // Redis functionality is disabled in serverless environment
+    // The cache service will use in-memory cache as fallback
+    // This avoids build issues with ioredis which requires native modules
+    console.log('ℹ️ Redis disabled in serverless environment, using in-memory cache');
   }
 
   /**

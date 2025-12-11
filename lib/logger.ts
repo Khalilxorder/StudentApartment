@@ -3,55 +3,59 @@
  * Provides consistent logging across the application
  */
 
-import pino from 'pino';
+// Safe logger initialization - falls back to console if pino fails
+let logger: any;
 
-// Create logger instance
-export const logger = pino({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+try {
+  // Dynamic import to prevent build-time failures
+  const pino = require('pino');
 
-  // Redact sensitive information (PII)
-  redact: {
-    paths: [
-      'email',
-      'password',
-      '*.email',
-      '*.password',
-      'req.headers.authorization',
-      'req.headers.cookie',
-      'user.email',
-      'user.password',
-      'token',
-      '*.token',
-    ],
-    remove: true,
-  },
+  logger = pino({
+    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
 
-  // Format configuration
-  ...(process.env.NODE_ENV !== 'production' && {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
+    // Redact sensitive information (PII)
+    redact: {
+      paths: [
+        'email',
+        'password',
+        '*.email',
+        '*.password',
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'user.email',
+        'user.password',
+        'token',
+        '*.token',
+      ],
+      remove: true,
     },
-  }),
 
-  // Base configuration for all logs
-  base: {
-    env: process.env.NODE_ENV,
-    service: 'student-apartments',
-  },
+    // Base configuration for all logs
+    base: {
+      env: process.env.NODE_ENV,
+      service: 'student-apartments',
+    },
 
-  // Serialize errors properly
-  serializers: {
-    err: pino.stdSerializers.err,
-    error: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res,
-  },
-});
+    // Serialize errors properly
+    serializers: {
+      err: pino.stdSerializers.err,
+      error: pino.stdSerializers.err,
+      req: pino.stdSerializers.req,
+      res: pino.stdSerializers.res,
+    },
+  });
+} catch {
+  // Fallback to console-based logger for build time
+  logger = {
+    info: (...args: any[]) => console.log('[INFO]', ...args),
+    warn: (...args: any[]) => console.warn('[WARN]', ...args),
+    error: (...args: any[]) => console.error('[ERROR]', ...args),
+    debug: (...args: any[]) => console.debug('[DEBUG]', ...args),
+    child: () => logger,
+  };
+}
+
+export { logger };
 
 /**
  * Create a child logger with additional context
