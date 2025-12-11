@@ -35,6 +35,13 @@ const nextConfig = {
       loader: 'ignore-loader',
     });
 
+    // Exclude scripts directory from Next.js build (development scripts only)
+    config.module.rules.push({
+      test: /\.ts$/,
+      include: /scripts\//,
+      loader: 'ignore-loader',
+    });
+
     // Enable polling for network share compatibility
     config.watchOptions = {
       poll: 1000,           // Check for changes every second

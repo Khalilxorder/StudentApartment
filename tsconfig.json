@@ -40,9 +40,7 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "scripts/**/*.ts",
-    "tests/**/*.ts"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
@@ -58,6 +56,9 @@
     "mobile-app",
     ".next",
     ".github",
-    "Owner listing"
+    "Owner listing",
+    "scripts",
+    "tests",
+    "lib/queues"
   ]
 }
