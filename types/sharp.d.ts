@@ -3,6 +3,14 @@
 
 // Namespace declaration for sharp.Sharp type references
 declare namespace sharp {
+    interface CreateOptions {
+        width: number;
+        height: number;
+        channels: 3 | 4;
+        background?: string | { r: number; g: number; b: number; alpha?: number };
+        noise?: { type: 'gaussian'; mean?: number; sigma?: number };
+    }
+
     interface SharpOptions {
         failOnError?: boolean;
         pages?: number;
@@ -13,6 +21,7 @@ declare namespace sharp {
         unlimited?: boolean;
         sequentialRead?: boolean;
         animated?: boolean;
+        create?: CreateOptions;
     }
 
     interface Metadata {
@@ -126,6 +135,7 @@ declare namespace sharp {
 
 // Function declaration for sharp(input) calls
 declare function sharp(input?: Buffer | string, options?: sharp.SharpOptions): sharp.Sharp;
+declare function sharp(options: { create: sharp.CreateOptions }): sharp.Sharp;
 
 // Module declaration for import sharp from 'sharp'
 declare module 'sharp' {
