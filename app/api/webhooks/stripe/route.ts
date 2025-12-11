@@ -152,7 +152,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     });
   }
 
-  // 5. Send confirmation emails using email queue
+  // 5. Send confirmation emails using Resend API directly
   try {
     // Get user email for confirmation
     const { data: userProfile } = await supabase
@@ -162,52 +162,68 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
       .single();
 
     if (userProfile?.email) {
-      // Dynamically import email queue to avoid build-time issues
-      const { emailQueue } = await import('@/services/notify-svc/email-queue');
-
-      // Send booking confirmation to renter
-      const guestName = userProfile.full_name || 'Guest';
-      await emailQueue.addEmailJob({
-        to: userProfile.email,
-        subject: 'Booking Confirmed - Student Apartments',
-        html: `
-          <h1>Booking Confirmed!</h1>
-          <p>Dear ${guestName},</p>
-          <p>Your booking (ID: ${bookingId}) has been confirmed.</p>
-          <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been processed successfully.</p>
-          <p>You can view your booking details in your dashboard.</p>
-          <p>Thank you for using Student Apartments!</p>
-        `,
-        tags: [{ name: 'type', value: 'booking-confirmation' }]
-      });
-
-      // Notify owner if available
-      if (booking?.owner_id) {
-        const { data: ownerProfile } = await supabase
-          .from('profiles')
-          .select('email, full_name')
-          .eq('id', booking.owner_id)
-          .single();
-
-        if (ownerProfile?.email) {
-          const apartmentTitle = (booking.apartments as { title?: string })?.title || 'your apartment';
-          const ownerName = ownerProfile.full_name || 'Owner';
-          await emailQueue.addEmailJob({
-            to: ownerProfile.email,
-            subject: 'New Booking Received - Student Apartments',
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        logger.warn('RESEND_API_KEY not configured, skipping confirmation emails');
+      } else {
+        // Send booking confirmation to renter
+        const guestName = userProfile.full_name || 'Guest';
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Student Apartments <noreply@studentapartments.com>',
+            to: userProfile.email,
+            subject: 'Booking Confirmed - Student Apartments',
             html: `
-              <h1>New Booking Received!</h1>
-              <p>Dear ${ownerName},</p>
-              <p>You have a new booking for ${apartmentTitle}.</p>
-              <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been received.</p>
-              <p>Booking ID: ${bookingId}</p>
-              <p>Please review the booking in your owner dashboard.</p>
+              <h1>Booking Confirmed!</h1>
+              <p>Dear ${guestName},</p>
+              <p>Your booking (ID: ${bookingId}) has been confirmed.</p>
+              <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been processed successfully.</p>
+              <p>You can view your booking details in your dashboard.</p>
+              <p>Thank you for using Student Apartments!</p>
             `,
-            tags: [{ name: 'type', value: 'owner-booking-notification' }]
-          });
+          }),
+        });
+
+        // Notify owner if available
+        if (booking?.owner_id) {
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', booking.owner_id)
+            .single();
+
+          if (ownerProfile?.email) {
+            const apartmentTitle = (booking.apartments as { title?: string })?.title || 'your apartment';
+            const ownerName = ownerProfile.full_name || 'Owner';
+            await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'Student Apartments <noreply@studentapartments.com>',
+                to: ownerProfile.email,
+                subject: 'New Booking Received - Student Apartments',
+                html: `
+                  <h1>New Booking Received!</h1>
+                  <p>Dear ${ownerName},</p>
+                  <p>You have a new booking for ${apartmentTitle}.</p>
+                  <p>Payment of ${(paymentIntent.amount / 100).toLocaleString()} HUF has been received.</p>
+                  <p>Booking ID: ${bookingId}</p>
+                  <p>Please review the booking in your owner dashboard.</p>
+                `,
+              }),
+            });
+          }
         }
+        logger.info({ bookingId }, '📧 Confirmation emails sent successfully');
       }
-      logger.info({ bookingId }, '📧 Confirmation emails queued successfully');
     }
   } catch (emailError) {
     // Don't fail the webhook if email fails - just log it

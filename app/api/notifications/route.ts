@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-build-safe';
 import { Resend } from 'resend';
-import { emailQueue } from '@/services/notify-svc/email-queue';
 import { logger } from '@/lib/logger';
 
 // Lazy-load Resend for email notifications
@@ -284,21 +283,36 @@ async function sendNotification(
 
 async function sendEmailNotification(email: string, subject: string, message: string) {
   try {
-    // Queue email for asynchronous sending
-    const job = await emailQueue.addEmailJob({
-      to: email,
-      subject,
-      html: message.replace(/\n/g, '<br>'),
-      tags: [{ name: 'source', value: 'api' }],
+    // Send email directly via Resend API
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      logger.warn({ email }, 'RESEND_API_KEY not configured, email skipped');
+      return;
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Student Apartments <noreply@studentapartments.com>',
+        to: email,
+        subject,
+        html: message.replace(/\n/g, '<br>'),
+      }),
     });
 
-    if (job) {
-      logger.info({ email, jobId: job.id }, 'Email queued');
+    if (response.ok) {
+      const result = await response.json();
+      logger.info({ email, messageId: result.id }, 'Email sent');
     } else {
-      logger.warn({ email }, 'Email queue not available, skipped');
+      const errorText = await response.text();
+      logger.warn({ email, error: errorText }, 'Failed to send email');
     }
   } catch (error) {
-    logger.error({ error }, 'Error queuing email');
+    logger.error({ error }, 'Error sending email');
     throw error;
   }
 }
