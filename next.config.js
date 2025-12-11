@@ -21,6 +21,20 @@ const nextConfig = {
       loader: 'ignore-loader',
     });
 
+    // Exclude tests directory from Next.js build (not needed in production)
+    config.module.rules.push({
+      test: /\.tsx?$/,
+      include: /tests\//,
+      loader: 'ignore-loader',
+    });
+
+    // Exclude queue workers from Next.js build (these run as separate processes)
+    config.module.rules.push({
+      test: /\.ts$/,
+      include: /lib\/queues/,
+      loader: 'ignore-loader',
+    });
+
     // Enable polling for network share compatibility
     config.watchOptions = {
       poll: 1000,           // Check for changes every second
