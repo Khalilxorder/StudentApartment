@@ -126,30 +126,42 @@ export class NotificationService {
     }
 
     try {
-      // Import email queue service dynamically
-      const { emailQueue } = await import('./email-queue');
-
-      // Queue email for asynchronous sending
-      const job = await emailQueue.addEmailJob({
-        to: recipient.email,
-        subject: content.subject,
-        html: content.body,
-        tags: [
-          { name: 'priority', value: priority },
-          { name: 'template', value: 'notification' },
-        ],
-      });
-
-      if (!job || !job.id) {
-        return { success: false, channel: 'email', error: 'Failed to queue email' };
+      // Send email directly via Resend API
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        return { success: false, channel: 'email', error: 'RESEND_API_KEY not configured' };
       }
 
-      return { success: true, channel: 'email', messageId: `job_${job.id}` };
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Student Apartments <noreply@studentapartments.com>',
+          to: recipient.email,
+          subject: content.subject,
+          html: content.body,
+          tags: [
+            { name: 'priority', value: priority },
+            { name: 'template', value: 'notification' },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, channel: 'email', error: `Resend API error: ${errorText}` };
+      }
+
+      const result = await response.json();
+      return { success: true, channel: 'email', messageId: result.id };
     } catch (error) {
       return {
         success: false,
         channel: 'email',
-        error: error instanceof Error ? error.message : 'Queue error',
+        error: error instanceof Error ? error.message : 'Email send error',
       };
     }
   }
