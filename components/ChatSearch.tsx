@@ -638,7 +638,18 @@ export default function ChatSearch() {
       }
     }
 
-    let apartments = await fetchApartments(localParse);
+    // Fetch apartments from database
+    pushMessage('system', '📊 Fetching apartments...');
+    let apartments: any[] = [];
+    try {
+      apartments = await fetchApartments(localParse);
+      console.log(`✅ Fetched ${apartments?.length || 0} apartments`);
+    } catch (fetchError) {
+      console.error('❌ fetchApartments error:', fetchError);
+      pushMessage('ai', '❌ Error connecting to database. Please try again.');
+      setLoading(false);
+      return;
+    }
 
     // Early return if no apartments found
     if (!apartments || apartments.length === 0) {
@@ -649,6 +660,8 @@ export default function ChatSearch() {
       setLoading(false);
       return;
     }
+
+    pushMessage('system', `📊 Scoring ${apartments.length} apartments...`);
 
     let scored = apartments.map((apt: any) => {
       // Extract features from apartment data
