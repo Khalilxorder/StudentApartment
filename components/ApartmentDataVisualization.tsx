@@ -37,7 +37,7 @@ export default function ApartmentDataVisualization({
         <h3 className="text-lg font-semibold text-gray-900">Property Analytics</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className={`grid ${minimal ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-6`}>
         {/* Price Analysis */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h4 className="text-sm font-medium text-gray-900 mb-3">Price Analysis</h4>
