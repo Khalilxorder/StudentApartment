@@ -428,6 +428,13 @@ export default function ChatSearch() {
 
   const fetchApartments = async (filters: any) => {
     console.log('🔍 Fetching with filters:', filters);
+
+    // Validate Supabase client is available
+    if (!supabase) {
+      console.error('❌ Supabase client is not initialized. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      throw new Error('Database connection not available. Missing Supabase configuration.');
+    }
+
     let query = supabase
       .from('apartments')
       .select(`
@@ -644,9 +651,10 @@ export default function ChatSearch() {
     try {
       apartments = await fetchApartments(localParse);
       console.log(`✅ Fetched ${apartments?.length || 0} apartments`);
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       console.error('❌ fetchApartments error:', fetchError);
-      pushMessage('ai', '❌ Error connecting to database. Please try again.');
+      const errorMessage = fetchError?.message || 'Unknown error';
+      pushMessage('ai', `❌ Database error: ${errorMessage}`);
       setLoading(false);
       return;
     }
