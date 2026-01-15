@@ -60,7 +60,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <span className="text-2xl">🏠</span>
-            <span className="font-bold text-lg text-gray-900">Student Apartments</span>
+            <span className="font-bold text-lg text-gray-900">HOME</span>
           </Link>
 
           {/* Navigation Links */}
