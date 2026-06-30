@@ -1,0 +1,13 @@
+allowBuilds:
+  '@scarf/scarf': false
+  '@sentry/cli': true
+  '@swc/core': true
+  '@tree-sitter-grammars/tree-sitter-yaml': true
+  chromedriver: true
+  core-js: true
+  core-js-pure: true
+  esbuild: true
+  puppeteer: true
+  tree-sitter: true
+  tree-sitter-json: true
+  unrs-resolver: true
