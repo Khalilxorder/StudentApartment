@@ -1,20 +1,17 @@
 
 import { mediaService } from '../services/media-svc/index';
-import sharp from 'sharp';
+
+const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64',
+);
 
 async function testMediaPipeline() {
     console.log('🧪 Testing Media Pipeline Service...');
 
     try {
-        // 1. Create a simple test image buffer (100x100 red square)
-        const testBuffer = await sharp({
-            create: {
-                width: 100,
-                height: 100,
-                channels: 4,
-                background: { r: 255, g: 0, b: 0, alpha: 1 }
-            }
-        }).png().toBuffer();
+        // 1. Use an inline PNG fixture so the serverless-safe test does not depend on sharp.
+        const testBuffer = onePixelPng;
 
         // 2. Test Analysis
         console.log('   Running analyzeImage...');

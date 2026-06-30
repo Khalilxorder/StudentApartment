@@ -9,13 +9,94 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Test Supabase client
 let testSupabase: SupabaseClient;
+const mockAuthUsers = new Map<string, { id: string; email: string; password: string }>();
+let mockCurrentUser: { id: string; email: string } | null = null;
+
+function shouldUseMockAuthClient(): boolean {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    return !url || url.includes('example.supabase.co') || key.includes('test');
+}
+
+function createMockAuthClient(): SupabaseClient {
+    const auth = {
+        signUp: vi.fn(async ({ email, password }: { email: string; password: string }) => {
+            const existing = mockAuthUsers.get(email);
+            const user = existing ?? {
+                id: `user-${mockAuthUsers.size + 1}`,
+                email,
+                password,
+            };
+            mockAuthUsers.set(email, user);
+            return {
+                data: {
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        email_confirmed_at: undefined,
+                    },
+                    session: null,
+                },
+                error: null,
+            };
+        }),
+        signInWithPassword: vi.fn(async ({ email, password }: { email: string; password: string }) => {
+            const user = mockAuthUsers.get(email);
+            if (!user || user.password !== password) {
+                return {
+                    data: { user: null, session: null },
+                    error: new Error('Invalid login credentials'),
+                };
+            }
+
+            mockCurrentUser = { id: user.id, email: user.email };
+            return {
+                data: {
+                    user: mockCurrentUser,
+                    session: { user: mockCurrentUser },
+                },
+                error: null,
+            };
+        }),
+        signOut: vi.fn(async () => {
+            mockCurrentUser = null;
+            return { error: null };
+        }),
+        getSession: vi.fn(async () => ({
+            data: { session: mockCurrentUser ? { user: mockCurrentUser } : null },
+            error: null,
+        })),
+        getUser: vi.fn(async () => ({
+            data: { user: mockCurrentUser },
+            error: null,
+        })),
+        resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+        admin: {
+            deleteUser: vi.fn(async (id: string) => {
+                for (const [email, user] of mockAuthUsers.entries()) {
+                    if (user.id === id) {
+                        mockAuthUsers.delete(email);
+                    }
+                }
+                if (mockCurrentUser?.id === id) {
+                    mockCurrentUser = null;
+                }
+                return { data: {}, error: null };
+            }),
+        },
+    };
+
+    return { auth } as unknown as SupabaseClient;
+}
 
 export function getTestClient(): SupabaseClient {
     if (!testSupabase) {
-        testSupabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-        );
+        testSupabase = shouldUseMockAuthClient()
+            ? createMockAuthClient()
+            : createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+            );
     }
     return testSupabase;
 }
